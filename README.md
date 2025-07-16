@@ -14,9 +14,11 @@ Brief description of your project.
 ## Usage
 
 TODO: Add usage instructions
+```markdown
+<details>
+<summary><strong>📁 Project Structure</strong></summary>
 
-
-<details> <summary><strong>📁 Project Structure</strong></summary>
+```plaintext
 Raseed/
 ├── agents/
 │   └── __init__.py
@@ -66,7 +68,9 @@ Raseed/
 │   └── init.py
 ├── LICENSE
 ├── README.md
-</details>
+</details> ```
+```
+
 
 
 ## Contributing
