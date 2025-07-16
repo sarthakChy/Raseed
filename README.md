@@ -13,7 +13,14 @@ Brief description of your project.
 
 ## Usage
 
-TODO: Add usage instructions
+### Server Setup
+
+**SERVER FILE**: server/run.py
+```
+.venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn server.run:app --host 0.0.0.0 --port 8000 --workers 2
+```
 
 <details>
 <summary><strong>📁 Project Structure</strong></summary>
@@ -61,6 +68,7 @@ Raseed/
 │   └── init.py
 ├── server/
 │   └── init.py
+│   └── run.py
 ├── tests/
 ├── ui/
 │   └── init.py
