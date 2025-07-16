@@ -18,7 +18,7 @@ TODO: Add usage instructions
 ## Project Structure
 Raseed/
 ├── agents/
-│   └── __init__.py
+│   └──__init__.py
 ├── client/
 │   ├── node_modules/
 │   ├── public/
