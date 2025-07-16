@@ -17,54 +17,55 @@ TODO: Add usage instructions
 
 ## Project Structure
 Raseed/
-├── agents/
-│   └──__init__.py
-├── client/
-│   ├── node_modules/
-│   ├── public/
+├── agents/               # Agents handling automation logic
+│   └── __init__.py
+├── client/               # Frontend (React + Vite)
+│   ├── node_modules/     # Node dependencies
+│   ├── public/           # Static public assets
 │   │   └── vite.svg
-│   ├── src/
-│   │   ├── assets/
+│   ├── src/              # Source code
+│   │   ├── assets/       # Static assets (e.g. images, logos)
 │   │   │   └── react.svg
-│   │   ├── components/
+│   │   ├── components/   # Reusable React components
 │   │   │   ├── ActionButton.jsx
 │   │   │   ├── PassCard.jsx
 │   │   │   ├── QuickActions.jsx
 │   │   │   ├── RecentPasses.jsx
 │   │   │   └── StatsCard.jsx
-│   │   ├── constants/
+│   │   ├── constants/    # Static constants used in UI
 │   │   │   └── pages.jsx
-│   │   ├── pages/
+│   │   ├── pages/        # Route-based pages
 │   │   │   ├── AskRaseed.jsx
 │   │   │   ├── CaptureReceipt.jsx
 │   │   │   └── Dashboard.jsx
-│   │   ├── App.css
-│   │   ├── App.jsx
-│   │   ├── index.css
-│   │   └── main.jsx
+│   │   ├── App.css       # Global styles
+│   │   ├── App.jsx       # Root React component
+│   │   ├── index.css     # Base styles
+│   │   └── main.jsx      # Entry point
 │   ├── README.md
-│   ├── eslint.config.js
-│   ├── index.html
+│   ├── eslint.config.js  # ESLint configuration
+│   ├── index.html        # HTML template
 │   ├── package-lock.json
 │   ├── package.json
-│   └── vite.config.js
-├── config/
-│   └── __init__.py
-├── core/
-│   └── __init__.py
-├── data/
-├── docs/
-├── models/
-│   └── __init__.py
-├── server/
-│   └── __init__.py
-├── tests/
-├── ui/
-│   └── __init__.py
-├── utils/
-│   └── __init__.py
+│   └── vite.config.js    # Vite config file
+├── config/               # Project-level configuration
+│   └── init.py
+├── core/                 # Core logic or base classes
+│   └── init.py
+├── data/                 # Datasets or temp files (placeholder)
+├── docs/                 # Documentation files
+├── models/               # ML/AI models
+│   └── init.py
+├── server/               # Server-side logic
+│   └── init.py
+├── tests/                # Unit/integration tests
+├── ui/                   # UI logic (e.g. CLI, web interface backend)
+│   └── init.py
+├── utils/                # Utility/helper functions
+│   └── init.py
 ├── LICENSE
 ├── README.md
+
 
 ## Contributing
 
