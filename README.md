@@ -16,55 +16,60 @@ Brief description of your project.
 TODO: Add usage instructions
 
 ## Project Structure
+<details> <summary><strong>📁 Project Structure</strong></summary>
+plaintext
+Copy
+Edit
 Raseed/
-├── agents/               # Agents handling automation logic
+├── agents/
 │   └── __init__.py
-├── client/               # Frontend (React + Vite)
-│   ├── node_modules/     # Node dependencies
-│   ├── public/           # Static public assets
+├── client/
+│   ├── node_modules/
+│   ├── public/
 │   │   └── vite.svg
-│   ├── src/              # Source code
-│   │   ├── assets/       # Static assets (e.g. images, logos)
+│   ├── src/
+│   │   ├── assets/
 │   │   │   └── react.svg
-│   │   ├── components/   # Reusable React components
+│   │   ├── components/
 │   │   │   ├── ActionButton.jsx
 │   │   │   ├── PassCard.jsx
 │   │   │   ├── QuickActions.jsx
 │   │   │   ├── RecentPasses.jsx
 │   │   │   └── StatsCard.jsx
-│   │   ├── constants/    # Static constants used in UI
+│   │   ├── constants/
 │   │   │   └── pages.jsx
-│   │   ├── pages/        # Route-based pages
+│   │   ├── pages/
 │   │   │   ├── AskRaseed.jsx
 │   │   │   ├── CaptureReceipt.jsx
 │   │   │   └── Dashboard.jsx
-│   │   ├── App.css       # Global styles
-│   │   ├── App.jsx       # Root React component
-│   │   ├── index.css     # Base styles
-│   │   └── main.jsx      # Entry point
+│   │   ├── App.css
+│   │   ├── App.jsx
+│   │   ├── index.css
+│   │   └── main.jsx
 │   ├── README.md
-│   ├── eslint.config.js  # ESLint configuration
-│   ├── index.html        # HTML template
+│   ├── eslint.config.js
+│   ├── index.html
 │   ├── package-lock.json
 │   ├── package.json
-│   └── vite.config.js    # Vite config file
-├── config/               # Project-level configuration
+│   └── vite.config.js
+├── config/
 │   └── init.py
-├── core/                 # Core logic or base classes
+├── core/
 │   └── init.py
-├── data/                 # Datasets or temp files (placeholder)
-├── docs/                 # Documentation files
-├── models/               # ML/AI models
+├── data/
+├── docs/
+├── models/
 │   └── init.py
-├── server/               # Server-side logic
+├── server/
 │   └── init.py
-├── tests/                # Unit/integration tests
-├── ui/                   # UI logic (e.g. CLI, web interface backend)
+├── tests/
+├── ui/
 │   └── init.py
-├── utils/                # Utility/helper functions
+├── utils/
 │   └── init.py
 ├── LICENSE
 ├── README.md
+</details>
 
 
 ## Contributing
