@@ -16,17 +16,55 @@ Brief description of your project.
 TODO: Add usage instructions
 
 ## Project Structure
-
-```
-├── config/          # Configuration files
-├── src/             # Source code
-├── core/            # Core functionality
-├── models/          # Data models
-├── utils/           # Utility functions
-├── data/            # Data files
-├── tests/           # Test files
-└── docs/            # Documentation
-```
+Raseed/
+├── agents/
+│   └── __init__.py
+├── client/
+│   ├── node_modules/
+│   ├── public/
+│   │   └── vite.svg
+│   ├── src/
+│   │   ├── assets/
+│   │   │   └── react.svg
+│   │   ├── components/
+│   │   │   ├── ActionButton.jsx
+│   │   │   ├── PassCard.jsx
+│   │   │   ├── QuickActions.jsx
+│   │   │   ├── RecentPasses.jsx
+│   │   │   └── StatsCard.jsx
+│   │   ├── constants/
+│   │   │   └── pages.jsx
+│   │   ├── pages/
+│   │   │   ├── AskRaseed.jsx
+│   │   │   ├── CaptureReceipt.jsx
+│   │   │   └── Dashboard.jsx
+│   │   ├── App.css
+│   │   ├── App.jsx
+│   │   ├── index.css
+│   │   └── main.jsx
+│   ├── README.md
+│   ├── eslint.config.js
+│   ├── index.html
+│   ├── package-lock.json
+│   ├── package.json
+│   └── vite.config.js
+├── config/
+│   └── __init__.py
+├── core/
+│   └── __init__.py
+├── data/
+├── docs/
+├── models/
+│   └── __init__.py
+├── server/
+│   └── __init__.py
+├── tests/
+├── ui/
+│   └── __init__.py
+├── utils/
+│   └── __init__.py
+├── LICENSE
+├── README.md
 
 ## Contributing
 
