@@ -15,11 +15,8 @@ Brief description of your project.
 
 TODO: Add usage instructions
 
-## Project Structure
+
 <details> <summary><strong>📁 Project Structure</strong></summary>
-plaintext
-Copy
-Edit
 Raseed/
 ├── agents/
 │   └── __init__.py
