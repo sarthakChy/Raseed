@@ -19,7 +19,7 @@ Brief description of your project.
 ```
 .venv\Scripts\activate
 pip install -r requirements.txt
-uvicorn server.run:app --host 0.0.0.0 --port 8000 --workers 2
+uvicorn server.run:app --host 0.0.0.0 --port 8000
 ```
 
 <details>
