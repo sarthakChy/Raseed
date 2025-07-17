@@ -131,13 +131,13 @@ export default function SignInCard() {
             Continue with Google
           </button>
 
-          <button
+          {/* <button
             onClick={() => signInWithGitHub()}
             className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-md border border-gray-300 bg-gray-900 text-sm font-semibold text-white hover:bg-black"
           >
             <Github size={20} />
             Continue with GitHub
-          </button>
+          </button> */}
         </div>
 
         <p className="mt-6 text-center text-sm text-gray-500">
