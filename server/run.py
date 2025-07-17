@@ -30,8 +30,8 @@ load_dotenv()
 
 # Initialize Vertex AI
 try:
-    PROJECT_ID = os.environ.get("GCP_PROJECT_ID","massive-incline-466204-t5")
-    LOCATION = os.environ.get("GCP_LOCATION", "us-central1")
+    PROJECT_ID = os.getenv("GCP_PROJECT_ID")
+    LOCATION = os.getenv("GCP_LOCATION")
     vertexai.init(project=PROJECT_ID, location=LOCATION)
 except KeyError:
     raise RuntimeError("GCP_PROJECT_ID not found in .env file. Please set it.")
