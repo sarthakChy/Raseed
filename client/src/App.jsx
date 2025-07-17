@@ -1,49 +1,56 @@
-import React, { useState } from 'react';
-
-// Import pages and constants
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import PrivateRoute from './components/PrivateRoute';
 import DashboardPage from './pages/Dashboard';
 import CaptureReceiptPage from './pages/CaptureReceipt';
 import AskRaseedPage from './pages/AskRaseed';
-import { PAGES } from './constants/pages';
+import SignInPage from './pages/SignIn';
+import SignUpPage from './pages/SignUp';
+import Home from './pages/Home';
 
-// Make sure you have removed all styles from src/index.css and src/App.css
-// before adding the 3 tailwind lines to index.css
+export default function App() {
+  return (
+    <div className="bg-slate-50 min-h-screen font-sans text-gray-800">
+      <Router>
+        <Routes>
+          {/* Public Routes */}
+          <Route path="/" element={<Home />} />
+          <Route path="/signin" element={<SignInPage />} />
+          <Route path="/signup" element={<SignUpPage />} />
 
-function App() {
-    const [currentPage, setCurrentPage] = useState(PAGES.DASHBOARD);
+          {/* Private Routes */}
+          <Route
+            path="/dashboard"
+            element={
+              <PrivateRoute>
+                <DashboardPage />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/capture"
+            element={
+              <PrivateRoute>
+                <div className="max-w-md mx-auto">
+                  <CaptureReceiptPage />
+                </div>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/ask"
+            element={
+              <PrivateRoute>
+                <div className="max-w-md mx-auto">
+                  <AskRaseedPage />
+                </div>
+              </PrivateRoute>
+            }
+          />
 
-    const navigateTo = (page) => setCurrentPage(page);
-
-    const renderContent = () => {
-        switch (currentPage) {
-            case PAGES.CAPTURE_RECEIPT:
-                // This wrapper will center the capture page correctly
-                return (
-                    <div className="max-w-md mx-auto">
-                        <CaptureReceiptPage onBack={() => navigateTo(PAGES.DASHBOARD)} />
-                    </div>
-                );
-            case PAGES.ASK_RASEED:
-                 // This wrapper will center the ask page correctly
-                return (
-                    <div className="max-w-md mx-auto">
-                         <AskRaseedPage onBack={() => navigateTo(PAGES.DASHBOARD)} />
-                    </div>
-                );
-            case PAGES.DASHBOARD:
-            default:
-                // The Dashboard component itself will manage its own width
-                return <DashboardPage onNavigate={navigateTo} />;
-        }
-    };
-
-    return (
-        <div className="bg-slate-50 min-h-screen font-sans text-gray-800">
-            <div className="w-full p-4 lg:p-8">
-                {renderContent()}
-            </div>
-        </div>
-    );
+          <Route path="*" element={<Navigate to="/" />} />
+        </Routes>
+      </Router>
+    </div>
+  );
 }
-
-export default App;
