@@ -9,8 +9,8 @@ function RecentPasses() {
     ];
 
     return (
-        <section>
-            <h4 className="font-bold text-xl text-slate-700 mb-3">Recent Wallet Passes</h4>
+        <section className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-8">
+            <h4 className="font-bold text-xl text-slate-700 mb-4">Recent Wallet Passes</h4>
             <div className="space-y-3">
                 {mockRecentPasses.map(pass => <PassCard key={pass.id} pass={pass} />)}
             </div>
