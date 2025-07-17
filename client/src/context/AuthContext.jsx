@@ -9,7 +9,7 @@ import {
   GoogleAuthProvider,
   GithubAuthProvider,
 } from "firebase/auth";
-import { auth } from "../lib/firebase";
+import { auth } from "../../firebase";
 
 const AuthContext = createContext();
 
@@ -38,6 +38,8 @@ export function AuthProvider({ children }) {
   const signIn = async ({ email, password }) => {
     const userCred = await signInWithEmailAndPassword(auth, email, password);
     setUser(userCred.user);
+    const token = await userCred.user.getIdToken();
+    localStorage.setItem("Token", token);
     return userCred.user;
   };
 
