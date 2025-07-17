@@ -1,28 +1,88 @@
-import React, { useState } from 'react';
-import { ArrowLeft, Upload } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ArrowLeft, Upload, Loader2 } from 'lucide-react';
+import AnalysisResultCard from '../components/AnalysisResultCard'; // Import the new card
 
-function CaptureReceiptPage({ onBack }) {
+function CaptureReceiptPage({ user, onBack }) {
     const [selectedFile, setSelectedFile] = useState(null);
     const [previewUrl, setPreviewUrl] = useState(null);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [analysisResult, setAnalysisResult] = useState(null);
+    const [error, setError] = useState(null);
+
+    useEffect(() => {
+        if (selectedFile && !analysisResult) {
+            handleAnalyze();
+        }
+    }, [selectedFile]);
 
     const handleFileChange = (event) => {
         const file = event.target.files[0];
         if (file) {
+            setAnalysisResult(null);
+            setError(null);
             setSelectedFile(file);
             setPreviewUrl(URL.createObjectURL(file));
         }
     };
 
-    const handleAnalyze = () => {
+    const handleAnalyze = async () => {
         if (!selectedFile) return;
         setIsAnalyzing(true);
-        setTimeout(() => {
+        setError(null);
+
+        const formData = new FormData();
+        formData.append('file', selectedFile);
+
+        try {
+
+            const token = localStorage.getItem('Token');
+            const response = await fetch('http://localhost:8000/api/receipts/analyze', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData,
+            });
+
+            if (!response.ok) {
+                const errData = await response.json();
+                throw new Error(errData.detail || `Request failed`);
+            }
+
+            const result = await response.json();
+            setAnalysisResult(result);
+        } catch (err) {
+            setError(err.message);
+        } finally {
             setIsAnalyzing(false);
-            alert("Receipt analysis complete! (Simulation)");
-        }, 2000);
+        }
     };
 
+    const handleScanAnother = () => {
+        setAnalysisResult(null);
+        setSelectedFile(null);
+        setPreviewUrl(null);
+        setError(null);
+    };
+
+    const handleAddToWallet = () => {
+        // This is where the Google Wallet API logic will go
+        alert("Adding to Google Wallet... (Not yet implemented)");
+    };
+
+    // --- UPDATED: Conditional Rendering ---
+    // If we have a result, show the new AnalysisResultCard.
+    if (analysisResult) {
+        return (
+            <div className="max-w-md mx-auto">
+                 <AnalysisResultCard 
+                    analysisResult={analysisResult}
+                    onScanAnother={handleScanAnother}
+                    onAddToWallet={handleAddToWallet}
+                 />
+            </div>
+        );
+    }
+
+    // Otherwise, show the upload screen.
     return (
         <div className="max-w-md mx-auto">
             <header className="flex items-center py-4">
@@ -46,28 +106,19 @@ function CaptureReceiptPage({ onBack }) {
                         <span className="text-sm text-slate-500 mt-1">PNG, JPG, etc.</span>
                     </label>
                 ) : (
-                    <div className="mb-4">
-                        <img src={previewUrl} alt="Receipt Preview" className="w-full h-auto rounded-lg shadow-inner" />
+                    <div className="relative">
+                        <div className="mb-4 max-h-96 overflow-y-auto rounded-lg border border-slate-200 shadow-inner">
+                            <img src={previewUrl} alt="Receipt Preview" className={`w-full h-auto transition-opacity duration-300 ${isAnalyzing ? 'opacity-20' : 'opacity-100'}`} />
+                        </div>
+                        {isAnalyzing && (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/50">
+                                <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
+                                <p className="mt-2 font-semibold text-slate-700">Analyzing...</p>
+                            </div>
+                        )}
                     </div>
                 )}
-
-                {selectedFile && (
-                    <div className="text-center mt-4">
-                        <button
-                            onClick={handleAnalyze}
-                            disabled={isAnalyzing}
-                            className="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-300 flex items-center justify-center"
-                        >
-                            {isAnalyzing && (
-                                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                            )}
-                            {isAnalyzing ? "Analyzing..." : "Analyze Receipt"}
-                        </button>
-                    </div>
-                )}
+                {error && <p className="text-red-500 text-sm mt-4 text-center">{error}</p>}
             </div>
         </div>
     );

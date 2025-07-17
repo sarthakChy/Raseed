@@ -7,6 +7,7 @@ import AskRaseedPage from './pages/AskRaseed';
 import SignInPage from './pages/SignIn';
 import SignUpPage from './pages/SignUp';
 import Home from './pages/Home';
+import ReceiptPassPreview from './components/AnalysisResultCard';
 
 export default function App() {
   return (
