@@ -6,6 +6,29 @@ import traceback
 from pathlib import Path
 from typing import List, Dict, Any, Literal
 from datetime import datetime, timedelta, timezone
+from google.oauth2 import id_token
+from google.auth.transport import requests
+from agents.prompts import SYSTEM_INSTRUCTION, FEW_SHOT_EXAMPLES
+from datetime import datetime, timezone
+from google.cloud import firestore, storage
+from utils.google_services_utils import initialize_firestore, initialize_gcs_client
+from server.utils.storage_utils import save_receipt_to_cloud
+import requests as req
+import uuid
+import asyncio
+import logging
+import uuid
+import time
+import sys
+import os
+import json
+import psutil
+import jwt
+import random
+import re
+import traceback
+import base64
+from dotenv import load_dotenv
 
 from fastapi import (
     FastAPI, HTTPException, Query, Body, Request,
@@ -27,16 +50,16 @@ from google.auth.transport import requests as google_requests
 import firebase_admin
 from firebase_admin import credentials, auth
 
-from agents.promts import SYSTEM_INSTRUCTION, FEW_SHOT_EXAMPLES
+from agents.prompts import SYSTEM_INSTRUCTION, FEW_SHOT_EXAMPLES
 
 
 # ========================== Environment Setup ==========================
 load_dotenv()
 
 try:
-    PROJECT_ID = os.environ.get("GCP_PROJECT_ID", "massive-incline-466204-t5")
-    LOCATION = os.environ.get("GCP_LOCATION", "us-central1")
-    vertexai_init(project=PROJECT_ID, location=LOCATION)
+    PROJECT_ID = os.getenv("PROJECT_ID")
+    LOCATION = os.getenv("GCP_LOCATION")
+    vertexai.init(project=PROJECT_ID, location=LOCATION)
 except KeyError:
     raise RuntimeError("GCP_PROJECT_ID not found in .env file.")
 
@@ -48,6 +71,16 @@ if not firebase_admin._apps:
     except Exception as e:
         raise RuntimeError(f"Could not initialize Firebase Admin SDK: {str(e)}")
 
+#Initialize cloud storage and firestore clients
+
+try:
+    BUCKET_NAME = os.getenv("GCS_BUCKET_NAME")
+except KeyError:
+    raise RuntimeError("GCS_BUCKET_NAME not found in .env file. Please set it.")
+
+storage_client = initialize_gcs_client()
+db = initialize_firestore()
+bucket = storage_client.bucket(BUCKET_NAME)
 
 # ========================== App Initialization ==========================
 app = FastAPI(
@@ -129,7 +162,17 @@ async def analyze_receipt(
         )
 
         parsed_data = json.loads(response.text)
-        return JSONResponse(content=parsed_data)
+
+        final_data = save_receipt_to_cloud(
+            db=db,
+            bucket=bucket,
+            parsed_data=parsed_data,
+            image_bytes=user_image_bytes,
+            file=file,
+            user_id=None 
+        )
+
+        return JSONResponse(content=final_data)
 
     except json.JSONDecodeError:
         logging.error(f"Failed to decode JSON from Vertex AI response: {response.text}")
