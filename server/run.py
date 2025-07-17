@@ -12,6 +12,7 @@ from google.auth.transport import requests
 from agents.prompts import SYSTEM_INSTRUCTION, FEW_SHOT_EXAMPLES
 from datetime import datetime, timezone
 from google.cloud import firestore, storage
+from utils.google_services_utils import initialize_firestore, initialize_gcs_client
 from server.utils.storage_utils import save_receipt_to_cloud
 import requests as req
 import uuid
@@ -34,7 +35,7 @@ load_dotenv()
 
 # Initialize Vertex AI
 try:
-    PROJECT_ID = os.getenv("GCP_PROJECT_ID")
+    PROJECT_ID = os.getenv("PROJECT_ID")
     LOCATION = os.getenv("GCP_LOCATION")
     vertexai.init(project=PROJECT_ID, location=LOCATION)
 except KeyError:
@@ -47,11 +48,9 @@ try:
 except KeyError:
     raise RuntimeError("GCS_BUCKET_NAME not found in .env file. Please set it.")
 
-db = firestore.Client(project=PROJECT_ID)
-storage_client = storage.Client(project=PROJECT_ID)
+storage_client = initialize_gcs_client()
+db = initialize_firestore()
 bucket = storage_client.bucket(BUCKET_NAME)
-
-
 
 app = FastAPI(
     title="Raseed API",
@@ -77,7 +76,7 @@ app.add_middleware(
 def root():
     return {"message": "Welcome to the API. Visit /docs for documentation."}
 
-@app.post("/api/receipts/analyze")
+@app.post("/receipts/analyze")
 async def analyze_receipt(file: UploadFile = File(...)):
     """
     Analyzes a receipt image using a few-shot conversational prompt with a system instruction.
