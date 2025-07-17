@@ -13,13 +13,23 @@ Brief description of your project.
 
 ## Usage
 
+### Client Setup
+Firebase console configs in .env
+
 ### Server Setup
 
 **SERVER FILE**: server/run.py
 ```
 .venv\Scripts\activate
 pip install -r requirements.txt
+
+#important to do this, ask for serviceAccountKey.json. Must be kept inside server folder
+$env:FIREBASE_CREDENTIALS = Get-Content "FULL PATH TO serviceAccountKey.json" -Raw 
+
 uvicorn server.run:app --host 0.0.0.0 --port 8000
+
+
+## Must have firebase-sdk.json file in root
 ```
 
 <details>

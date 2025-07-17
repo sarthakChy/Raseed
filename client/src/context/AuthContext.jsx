@@ -48,6 +48,8 @@ export function AuthProvider({ children }) {
     const provider = new GoogleAuthProvider();
     const result = await signInWithPopup(auth, provider);
     setUser(result.user);
+    const token = await result.user.getIdToken();
+    localStorage.setItem("Token", token);
     return result.user;
   };
 

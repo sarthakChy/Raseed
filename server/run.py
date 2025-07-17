@@ -41,7 +41,7 @@ from fastapi.background import BackgroundTasks
 from dotenv import load_dotenv
 import requests as req
 
-from vertexai import init as vertexai_init
+import vertexai
 from vertexai.generative_models import GenerativeModel, Part, GenerationConfig
 
 from google.oauth2 import id_token
@@ -122,14 +122,14 @@ async def firebase_auth_required(request: Request):
 
 # ========================== Routes ==========================
 @app.get("/")
-async def root(request: Request, _=Depends(firebase_auth_required)):
+async def root(request: Request, auth=Depends(firebase_auth_required)):
     return {"message": "Welcome to the API. Visit /docs for documentation."}
 
 
-@app.post("/api/receipts/analyze")
+@app.post("/receipts/analyze")
 async def analyze_receipt(
     request: Request,
-    _=Depends(firebase_auth_required),
+    auth=Depends(firebase_auth_required),
     file: UploadFile = File(...),
 ):
     if not file.content_type.startswith("image/"):
