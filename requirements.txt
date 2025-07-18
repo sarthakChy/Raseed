@@ -1,5 +1,6 @@
 # ============================== Core Dependencies ==============================
 fastapi==0.116.1
+uvicorn==0.35.0
 starlette==0.47.1
 python-dotenv==1.1.1
 psutil==7.0.0
@@ -72,3 +73,4 @@ msgpack==1.1.1
 python-dateutil==2.9.0.post0
 pyparsing==3.2.3
 docstring_parser==0.16
+python-multipart==0.0.20
