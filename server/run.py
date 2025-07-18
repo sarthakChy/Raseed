@@ -51,6 +51,7 @@ import firebase_admin
 from firebase_admin import credentials, auth
 
 from agents.prompts import SYSTEM_INSTRUCTION, FEW_SHOT_EXAMPLES
+from agents.insights_agent import PurchaseInsightsAgent
 
 
 # ========================== Environment Setup ==========================
@@ -182,7 +183,6 @@ async def analyze_receipt(
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
-
 @app.post("/chat")
 async def chat_handler(
     request: Request,
@@ -205,3 +205,27 @@ async def chat_handler(
         logging.error(f"Chat endpoint error: {e}")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+    
+    
+@app.get("/analyze-insights")
+async def analyze_insights(
+    request: Request,
+    auth=Depends(firebase_auth_required)
+    ):
+    try:
+        
+        # Load local items.json each time the endpoint is hit
+        with open("items.json", "r", encoding="utf-8") as f:
+            sample_data = json.load(f)
+        
+        # Initialize agent
+        agent = PurchaseInsightsAgent(project_id=PROJECT_ID)
+
+        # Run analysis
+        results = agent.analyze_purchases(sample_data)
+
+        # Return as JSON
+        return JSONResponse(content=results.model_dump(), status_code=200)
+
+    except Exception as e:
+        return JSONResponse(content={"error": str(e)}, status_code=500)
