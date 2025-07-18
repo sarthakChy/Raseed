@@ -65,3 +65,4 @@ logs/
 
 #APIKeys
 firebase-sdk.json
+serviceAccountKey.json

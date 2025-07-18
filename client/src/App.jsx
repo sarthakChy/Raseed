@@ -3,10 +3,11 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import PrivateRoute from './components/PrivateRoute';
 import DashboardPage from './pages/Dashboard';
 import CaptureReceiptPage from './pages/CaptureReceipt';
-import AskRaseedPage from './pages/AskRaseed';
+import Chat from './pages/Chat';
 import SignInPage from './pages/SignIn';
 import SignUpPage from './pages/SignUp';
 import Home from './pages/Home';
+import './App.css';
 import ReceiptPassPreview from './components/AnalysisResultCard';
 
 export default function App() {
@@ -42,8 +43,8 @@ export default function App() {
             path="/ask"
             element={
               <PrivateRoute>
-                <div className="max-w-md mx-auto">
-                  <AskRaseedPage />
+                <div>
+                  <Chat />
                 </div>
               </PrivateRoute>
             }

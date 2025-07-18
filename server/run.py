@@ -181,3 +181,27 @@ async def analyze_receipt(
         logging.error(f"An error occurred during receipt analysis: {e}")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+@app.post("/chat")
+async def chat_handler(
+    request: Request,
+    auth=Depends(firebase_auth_required),
+    body: dict = Body(...)
+):
+    try:
+        user_message = body.get("message")
+        if not user_message:
+            raise HTTPException(status_code=400, detail="Missing 'message' in body.")
+
+        model = GenerativeModel("gemini-2.0-flash-001")
+        chat = model.start_chat()
+
+        response = chat.send_message(user_message)
+
+        return JSONResponse(content={"reply": response.text})
+
+    except Exception as e:
+        logging.error(f"Chat endpoint error: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
