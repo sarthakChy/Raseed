@@ -8,7 +8,6 @@ from typing import List, Dict, Any, Literal
 from datetime import datetime, timedelta, timezone
 from google.oauth2 import id_token
 from google.auth.transport import requests
-from agents.prompts import SYSTEM_INSTRUCTION, FEW_SHOT_EXAMPLES
 from datetime import datetime, timezone
 from google.cloud import firestore, storage
 from utils.google_services_utils import initialize_firestore, initialize_gcs_client
@@ -47,22 +46,18 @@ from vertexai.generative_models import GenerativeModel, Part, GenerationConfig
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 
+from utils.credentials import get_credentials
+
+from agents.insights_agent import PurchaseInsightsAgent
+from agents.receipt.receipts_agent import ReceiptAgent
+from agents.receipt.prompt import SYSTEM_INSTRUCTION, FEW_SHOT_EXAMPLES
+from utils.parse_json import parse_json
+
 import firebase_admin
 from firebase_admin import credentials, auth
 
-from agents.prompts import SYSTEM_INSTRUCTION, FEW_SHOT_EXAMPLES
-from agents.insights_agent import PurchaseInsightsAgent
-
-
 # ========================== Environment Setup ==========================
 load_dotenv()
-
-try:
-    PROJECT_ID = os.getenv("PROJECT_ID")
-    LOCATION = os.getenv("GCP_LOCATION")
-    vertexai.init(project=PROJECT_ID, location=LOCATION)
-except KeyError:
-    raise RuntimeError("GCP_PROJECT_ID not found in .env file.")
 
 if not firebase_admin._apps:
     FIREBASE_CRED_PATH = os.environ.get("FIREBASE_CRED_PATH", "firebase-sdk.json")
@@ -72,12 +67,7 @@ if not firebase_admin._apps:
     except Exception as e:
         raise RuntimeError(f"Could not initialize Firebase Admin SDK: {str(e)}")
 
-#Initialize cloud storage and firestore clients
-
-try:
-    BUCKET_NAME = os.getenv("GCS_BUCKET_NAME")
-except KeyError:
-    raise RuntimeError("GCS_BUCKET_NAME not found in .env file. Please set it.")
+PROJECT_ID,LOCATION, BUCKET_NAME = get_credentials()
 
 storage_client = initialize_gcs_client()
 db = initialize_firestore()
@@ -133,55 +123,38 @@ async def analyze_receipt(
     auth=Depends(firebase_auth_required),
     file: UploadFile = File(...),
 ):
-    if not file.content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="File provided is not an image.")
-
     try:
-        model = GenerativeModel(
-            "gemini-2.0-flash-001",
-            system_instruction=SYSTEM_INSTRUCTION
-        )
 
-        conversation_history = []
-        for example in FEW_SHOT_EXAMPLES:
-            json_part = Part.from_text(json.dumps(example["expected_json"]))
-            conversation_history.append(json_part)
-
+        #Reads fils bytes   
         user_image_bytes = await file.read()
-        user_image_part = Part.from_data(data=user_image_bytes, mime_type=file.content_type)
-        conversation_history.append(user_image_part)
+        
+        #Initialize the ReceiptAgent
+        agent = ReceiptAgent(
+                    project_id=PROJECT_ID,
+                    location=LOCATION,
+                    file_bytes=user_image_bytes,
+                    file_content_type=file.content_type,
+                    system_instruction=SYSTEM_INSTRUCTION
+                )
 
-        generation_config = GenerationConfig(
-            response_mime_type="application/json",
-            temperature=1.5,
-            max_output_tokens=3072,
-        )
-
-        response = await model.generate_content_async(
-            conversation_history,
-            generation_config=generation_config,
-        )
-
-        parsed_data = json.loads(response.text)
-
+        # Analyze the receipt
+        response = agent.analyze()
+        parsed_data = parse_json(response.text) 
+        
+        #Save the receipt to cloud storage and Firestore
         final_data = save_receipt_to_cloud(
-            db=db,
-            bucket=bucket,
-            parsed_data=parsed_data,
-            image_bytes=user_image_bytes,
-            file=file,
-            user_id=None 
-        )
+                db=db,
+                bucket=bucket,
+                parsed_data=parsed_data,
+                image_bytes=user_image_bytes, 
+                file=file,
+                user_id=None 
+            )
 
-        return JSONResponse(content=final_data)
-
-    except json.JSONDecodeError:
-        logging.error(f"Failed to decode JSON from Vertex AI response: {response.text}")
-        raise HTTPException(status_code=500, detail="Could not parse the AI model's response.")
+        return JSONResponse(content=final_data, status_code=200)
     except Exception as e:
-        logging.error(f"An error occurred during receipt analysis: {e}")
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        return JSONResponse(content={"error": str(e)}, status_code=501)
+        
 
 @app.post("/chat")
 async def chat_handler(
