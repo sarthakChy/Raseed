@@ -25,6 +25,8 @@ pip install -r requirements.txt
 
 #important to do this, ask for serviceAccountKey.json. Must be kept inside server folder
 $env:FIREBASE_CREDENTIALS = Get-Content "FULL PATH TO serviceAccountKey.json" -Raw 
+export FIREBASE_CREDENTIALS="$(cat FULL PATH TO serviceAccountKey.json)"
+
 
 uvicorn server.run:app --host 0.0.0.0 --port 8000
 
