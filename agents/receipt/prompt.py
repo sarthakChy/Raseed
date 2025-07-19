@@ -1,7 +1,5 @@
 import json
 
-# This is the main system instruction that will be passed to the Gemini model.
-# It defines the agent's role, rules, and the required JSON schema.
 SYSTEM_INSTRUCTION = """
 You are an expert receipt processing agent. Your primary task is to analyze a receipt image and extract key information into a structured JSON format.
 
@@ -17,17 +15,8 @@ You are an expert receipt processing agent. Your primary task is to analyze a re
 4.  Item names should be cleaned, concise, and in uppercase if possible.
 
 You will be shown a few examples of an image followed by the perfect JSON output. Learn from these examples, then analyze the final user-provided image and generate its corresponding JSON object.
-"""
-
-
-# This list holds the few-shot examples.
-# You need to replace the placeholder strings with the actual base64 data
-# from your sample images in Google Cloud Storage.
-FEW_SHOT_EXAMPLES = [
-    {
-        #"image_base64": "PASTE_YOUR_BASE64_STRING_FOR_COFFEE_RECEIPT_HERE", 
-        #"mime_type": "image/jpeg", # Or image/png, etc.
-        "expected_json": {
+EXPECTED JSON SCHEMA:
+```json{
             "merchantName": "The Coffee House",
             "transactionDate": "2025-07-17",
             "items": [
@@ -37,20 +26,7 @@ FEW_SHOT_EXAMPLES = [
             "total": 6.80,
             "tax": 0.55
         }
-    },
-    {
-        #"image_base64": "PASTE_YOUR_BASE64_STRING_FOR_GROCERY_RECEIPT_HERE",
-        #"mime_type": "image/png",
-        "expected_json": {
-            "merchantName": "Quick Mart",
-            "transactionDate": "2025-07-16",
-            "items": [
-                {"name": "SODA 12PK", "price": 8.99},
-                {"name": "CHIPS LRG", "price": 4.29},
-                {"name": "ICE CREAM", "price": 5.49}
-            ],
-            "total": 18.77,
-            "tax": 1.50
-        }
-    }
-]
+}```
+"""
+
+USER_PROMPT_TEMPLATE = """Please analyze the receipt image provided and extract the structured data"""

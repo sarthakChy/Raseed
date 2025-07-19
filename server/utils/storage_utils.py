@@ -29,6 +29,7 @@ def save_receipt_to_cloud(
         
         # This dictionary is for Firestore, which understands datetime objects
         firestore_data = parsed_data.copy()
+        firestore_data['id'] = doc_ref.id
         firestore_data['userId'] = 'anonymous' if user_id is None else user_id
         firestore_data['gcs_uri'] = f"gs://{bucket.name}/{unique_filename}"
         
