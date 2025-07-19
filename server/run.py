@@ -49,9 +49,12 @@ from utils.utils import get_credentials,parse_json,initialize_firestore, initial
 
 from agents.insights_agent import PurchaseInsightsAgent
 from agents.receipt.receipts_agent import ReceiptAgent
+from agents.wallet_agent import ReceiptWalletManager, WalletPassResponse, UpdatePassData, HealthResponse
 from server.utils.storage_utils import save_receipt_to_cloud
 
-
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # ========================== Environment Setup ==========================
 load_dotenv()
@@ -205,3 +208,115 @@ async def analyze_insights(
 
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
+
+# ========================== Google Wallet Integration ==========================
+
+wallet_manager = ReceiptWalletManager()
+
+@app.post("/receipts/create-wallet-pass", response_model=WalletPassResponse)
+async def create_wallet_pass(
+    request: Request,
+    auth=Depends(firebase_auth_required)
+):
+    """
+    Create a Google Wallet pass for a receipt.
+    
+    This endpoint takes receipt data and creates a digital wallet pass
+    that users can add to their Google Wallet app.
+    """
+    try:
+        
+        # Create wallet pass
+        receipt_data = await request.body()
+        logger.info(f"Creating wallet pass with data: {parse_json(receipt_data)}")
+        result = await wallet_manager.create_receipt_pass(parse_json(receipt_data))
+        
+        if result['success']:
+            return WalletPassResponse(
+                success=True,
+                message="Wallet pass created successfully",
+                object_id=result['object_id'],
+                wallet_link=result['wallet_link']
+            )
+        else:
+            logger.error(f"Failed to create wallet pass: {result.get('error', 'Unknown error')}")
+    except Exception as e:
+        logger.error(f"Internal error creating wallet pass: {e}")
+
+# @app.patch("/receipts/update-wallet-pass/{object_id}", response_model=WalletPassResponse)
+# async def update_wallet_pass(object_id: str, update_data: UpdatePassData):
+#     """
+#     Update an existing Google Wallet pass with new information.
+    
+#     This can be used to add AI-generated insights, spending tips, or other
+#     dynamic content to existing wallet passes.
+#     """
+#     try:
+#         if not object_id.strip():
+#             raise HTTPException(
+#                 status_code=status.HTTP_400_BAD_REQUEST,
+#                 detail="Object ID is required"
+#             )
+        
+#         result = await wallet_manager.update_wallet_pass(object_id, update_data)
+        
+#         if result['success']:
+#             return WalletPassResponse(
+#                 success=True,
+#                 message="Wallet pass updated successfully",
+#                 object_id=object_id
+#             )
+#         else:
+#             raise HTTPException(
+#                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+#                 detail=result.get('error', 'Failed to update wallet pass')
+#             )
+            
+#     except HTTPException:
+#         raise
+#     except Exception as e:
+#         logger.error(f"Unexpected error updating wallet pass: {e}")
+#         raise HTTPException(
+#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+#             detail=str(e)
+#         )
+
+# @app.post("/receipts/expire-wallet-pass/{object_id}", response_model=WalletPassResponse)
+# async def expire_wallet_pass(object_id: str):
+#     """
+#     Expire a Google Wallet pass.
+    
+#     This marks the wallet pass as expired, which will update its status
+#     in the user's Google Wallet app.
+#     """
+#     try:
+#         if not object_id.strip():
+#             raise HTTPException(
+#                 status_code=status.HTTP_400_BAD_REQUEST,
+#                 detail="Object ID is required"
+#             )
+        
+#         result = await wallet_manager.expire_wallet_pass(object_id)
+        
+#         if result['success']:
+#             return WalletPassResponse(
+#                 success=True,
+#                 message="Wallet pass expired successfully",
+#                 object_id=object_id
+#             )
+#         else:
+#             raise HTTPException(
+#                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+#                 detail=result.get('error', 'Failed to expire wallet pass')
+#             )
+            
+#     except HTTPException:
+#         raise
+#     except Exception as e:
+#         logger.error(f"Unexpected error expiring wallet pass: {e}")
+#         raise HTTPException(
+#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+#             detail=str(e)
+#         )
+
+

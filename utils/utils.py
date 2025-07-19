@@ -120,12 +120,17 @@ def initialize_gcs_client():
         logger.error(f"GCS client initialization error: {e}")
         raise
 
-def parse_json(raw_text):
+import json
+import re # Ensure re is imported
+
+def parse_json(raw_text) -> dict:
     """
-    Extracts and parses a JSON object from a Markdown code block (e.g., ```json ... ```).
+    Extracts and parses a JSON object from a Markdown code block (e.g., ```json ... ```)
+    or directly from a JSON string/byte string.
 
     Args:
-        raw_text (str): Raw text that includes a Markdown-style JSON block.
+        raw_text (str or bytes): Raw text or byte data that includes a Markdown-style JSON block
+                                 or is a direct JSON string.
 
     Returns:
         dict: Parsed JSON data as a Python dictionary.
@@ -133,18 +138,29 @@ def parse_json(raw_text):
     Raises:
         ValueError: If no valid JSON block is found or JSON parsing fails.
     """
+    # If input is bytes, decode it first
+    if isinstance(raw_text, bytes):
+        try:
+            raw_text = raw_text.decode('utf-8')
+        except UnicodeDecodeError as e:
+            raise ValueError(f"Failed to decode byte string to UTF-8: {e}")
+
     if not isinstance(raw_text, str):
-        raise ValueError("Input must be a string")
+        raise ValueError("Input must be a string or bytes convertible to string.")
 
-    # Match ```json ... ```
+    # Attempt to match ```json ... ``` markdown block
     match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", raw_text, re.DOTALL)
-    if not match:
-        raise ValueError("No valid JSON block found in the input text")
-
-    json_text = match.group(1).strip()
-
-    try:
-        return json.loads(json_text)
-    except json.JSONDecodeError as e:
-        raise ValueError(f"Failed to parse JSON: {e}")
+    
+    if match:
+        json_text = match.group(1).strip()
+        try:
+            return json.loads(json_text)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Failed to parse JSON from markdown block: {e}")
+    else:
+        # If no markdown block, assume the entire raw_text is a direct JSON string
+        try:
+            return json.loads(raw_text.strip())
+        except json.JSONDecodeError as e:
+            raise ValueError(f"No valid JSON block found or direct JSON parsing failed: {e}")
 
