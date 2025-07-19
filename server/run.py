@@ -10,8 +10,6 @@ from google.oauth2 import id_token
 from google.auth.transport import requests
 from datetime import datetime, timezone
 from google.cloud import firestore, storage
-from utils.google_services_utils import initialize_firestore, initialize_gcs_client
-from server.utils.storage_utils import save_receipt_to_cloud
 import requests as req
 import uuid
 import asyncio
@@ -40,21 +38,20 @@ from fastapi.background import BackgroundTasks
 from dotenv import load_dotenv
 import requests as req
 
-import vertexai
-from vertexai.generative_models import GenerativeModel, Part, GenerationConfig
-
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
-
-from utils.credentials import get_credentials
-
-from agents.insights_agent import PurchaseInsightsAgent
-from agents.receipt.receipts_agent import ReceiptAgent
-from agents.receipt.prompt import SYSTEM_INSTRUCTION, FEW_SHOT_EXAMPLES
-from utils.parse_json import parse_json
+import vertexai
 
 import firebase_admin
 from firebase_admin import credentials, auth
+
+from utils.utils import get_credentials,parse_json,initialize_firestore, initialize_gcs_client
+
+from agents.insights_agent import PurchaseInsightsAgent
+from agents.receipt.receipts_agent import ReceiptAgent
+from server.utils.storage_utils import save_receipt_to_cloud
+
+
 
 # ========================== Environment Setup ==========================
 load_dotenv()
@@ -67,13 +64,21 @@ if not firebase_admin._apps:
     except Exception as e:
         raise RuntimeError(f"Could not initialize Firebase Admin SDK: {str(e)}")
 
-PROJECT_ID,LOCATION, BUCKET_NAME = get_credentials()
+PROJECT_ID,LOCATION,BUCKET_NAME,GOOGLE_WALLET_ISSUER_ID = get_credentials()
+
+try:
+    vertexai.init(project=PROJECT_ID, location=LOCATION) #global init for Vertex AI SDK
+    logging.info(f"Vertex AI SDK initialized for project '{PROJECT_ID}' in '{LOCATION}'.")
+except Exception as e:
+    logging.error(f"Critical: Failed to initialize Vertex AI SDK: {e}")
+    sys.exit(1) 
 
 storage_client = initialize_gcs_client()
 db = initialize_firestore()
 bucket = storage_client.bucket(BUCKET_NAME)
 
 # ========================== App Initialization ==========================
+
 app = FastAPI(
     title="Raseed API",
     version="1.0.0",
@@ -123,37 +128,35 @@ async def analyze_receipt(
     auth=Depends(firebase_auth_required),
     file: UploadFile = File(...),
 ):
-    try:
-
+    try:    
         #Reads fils bytes   
         user_image_bytes = await file.read()
-        
         #Initialize the ReceiptAgent
         agent = ReceiptAgent(
-                    project_id=PROJECT_ID,
-                    location=LOCATION,
-                    file_bytes=user_image_bytes,
-                    file_content_type=file.content_type,
-                    system_instruction=SYSTEM_INSTRUCTION
-                )
-
+                        file_bytes=user_image_bytes,
+                        file_content_type=file.content_type,
+                    )
         # Analyze the receipt
         response = agent.analyze()
         parsed_data = parse_json(response.text) 
+            
         
         #Save the receipt to cloud storage and Firestore
         final_data = save_receipt_to_cloud(
-                db=db,
-                bucket=bucket,
-                parsed_data=parsed_data,
-                image_bytes=user_image_bytes, 
-                file=file,
-                user_id=None 
-            )
+                    db=db,
+                    bucket=bucket,
+                    parsed_data=parsed_data,
+                    image_bytes=user_image_bytes, 
+                    file=file,
+                    user_id=None 
+                )
 
         return JSONResponse(content=final_data, status_code=200)
     except Exception as e:
-        return JSONResponse(content={"error": str(e)}, status_code=501)
+        logging.error(f"Receipt analysis error: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+    
         
 
 @app.post("/chat")

@@ -1,62 +1,82 @@
-import vertexai
-from vertexai.generative_models import GenerativeModel, Part, GenerationConfig
-from fastapi import (
-    FastAPI, HTTPException, Query, Body, Request,
-    File, UploadFile, Form, Depends, Header
-)
-from fastapi.responses import JSONResponse
 import json
-from agents.receipt.prompt import SYSTEM_INSTRUCTION, FEW_SHOT_EXAMPLES
+import logging
+from typing import List, Dict, Any, Union
+
+import vertexai
+from vertexai.generative_models import GenerativeModel, Part, GenerationConfig, HarmCategory, HarmBlockThreshold, Content
+from agents.receipt.prompt import SYSTEM_INSTRUCTION, USER_PROMPT_TEMPLATE
+
+logger = logging.getLogger(__name__)
 
 class ReceiptAgent:
     """
-        Initialize the Vertex AI agent for receipt analysis.
+    Vertex AI agent for extracting structured data from receipt images.
+    Assumes `vertexai.init()` has been called globally before instantiation.
+    """
+    def __init__(self, file_bytes: bytes, file_content_type: str):
+        """
+        Initializes the ReceiptAgent.
 
         Args:
-            project_id: Google Cloud project ID
-            location: Vertex AI location
-            file_bytes: The actual bytes of the receipt image (read asynchronously by caller)
-            file_content_type: The content type of the image file
-    """
-    def __init__(self, project_id: str, location: str, file_bytes: bytes, file_content_type: str, system_instruction:str):
-        
-        self.project_id = project_id
-        self.location = location
-        vertexai.init(project=project_id, location=location)
-        
-        self.model = GenerativeModel("gemini-2.0-flash",system_instruction=SYSTEM_INSTRUCTION,)
+            file_bytes: The actual bytes of the receipt image.
+            file_content_type: The MIME type of the image file (e.g., "image/jpeg").
+        """
+        self.model = GenerativeModel("gemini-2.0-flash",system_instruction=SYSTEM_INSTRUCTION)
 
-        self.conversation_history = []
         self.user_image_bytes = file_bytes
         self.file_content_type = file_content_type
         
+        logger.info(f"ReceiptAgent instantiated. Model: {self.model._model_name}.")
+
+    def _build_contents(self) -> List[Content]:
+        """
+        Builds the 'contents' list for the Vertex AI generate_content method.
+        """
+        contents = [
+            USER_PROMPT_TEMPLATE,
+            Part.from_data(data=self.user_image_bytes, mime_type=self.file_content_type),
+        ]
+
+        return contents
+
     def analyze(self):
+        """
+        Analyzes the receipt image using the configured Gemini model.
+
+        Returns:
+            vertexai.generative_models.GenerationResponse: The response object from the AI model.
+
+        Raises:
+            HTTPException: If the file is not an image, or if the AI model
+                           returns an invalid or empty response.
+        """
         if not self.file_content_type.startswith("image/"):
-            raise HTTPException(status_code=400, detail="File provided is not an image.")
+            logger.error(f"File provided is not an image: {self.file_content_type}")
 
         try:
-            
-            for example in FEW_SHOT_EXAMPLES:
-                json_part = Part.from_text(json.dumps(example["expected_json"]))
-                self.conversation_history.append(json_part)
+            contents = self._build_contents()
+            logger.info("Contents built for generate_content call.")
 
-            user_image_part = Part.from_data(data=self.user_image_bytes, mime_type=self.file_content_type)
-            self.conversation_history.append(user_image_part)
-
-
-            self.response = self.model.generate_content( # Use await here
-                contents=self.conversation_history,
+            response = self.model.generate_content(
+                contents=contents,
                 generation_config=GenerationConfig(
                     temperature=0.3,
                     top_p=0.8,
                     top_k=40,
                     max_output_tokens=2048,
                 ),
+                safety_settings={
+                    HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+                    HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+                    HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+                    HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+                }
             )
+            logger.info("generate_content call completed.")
 
-            if not self.response or not self.response.text:
-                raise HTTPException(status_code=500, detail="No response from the AI model.")
+            if not response or not response.text:
+                logger.error("No response or empty text received from the AI model.")
             else:
-                return self.response
+                return response
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Error during receipt analysis: {str(e)}")
+            logger.exception(f"Error within ReceiptAgent.analyze: {str(e)}")
