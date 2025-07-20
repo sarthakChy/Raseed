@@ -31,13 +31,12 @@ class PurchaseInsightsAgent:
         processed_data = []
         
         for receipt in purchase_data:
-            receipt_date = datetime.fromisoformat(receipt['uploaded_at'].replace('Z', '+00:00'))
             
             for item in receipt['items']:
                 processed_data.append({
                     'receipt_id': receipt['id'],
-                    'date': receipt_date.date(),
-                    'datetime': receipt_date,
+                    'date': receipt['uploaded_at'].date(),
+                    'datetime': receipt['uploaded_at'].isoformat(),
                     'merchant': receipt['merchantName'],
                     'item_name': item['name'],
                     'price': item['price'],
@@ -112,6 +111,12 @@ class PurchaseInsightsAgent:
         """
         Create a comprehensive prompt for Gemini to analyze purchase patterns
         """
+
+        # Convert uploaded_at to isoformat if needed
+        for receipt in raw_data:
+            if isinstance(receipt.get("uploaded_at"), (datetime, )):
+                receipt["uploaded_at"] = receipt["uploaded_at"].isoformat()
+
         prompt = f"""
         You are an AI agent specialized in analyzing consumer purchase behavior to provide actionable insights about daily usage patterns and spending habits.
 
