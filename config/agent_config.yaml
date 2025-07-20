@@ -1,0 +1,289 @@
+agents:
+  - name: query_translation_agent
+    class_path: agents.query_translation_agent.QueryTranslationAgent
+    description: Converts natural language queries into structured analytical requests
+    capabilities:
+      - natural_language_parsing
+      - query_decomposition
+      - context_management
+      - query_validation
+    required_for_intents:
+      - analytical
+      - exploratory
+      - actionable
+      - comparative
+      - predictive
+    optional_for_intents: []
+    retry_count: 2
+    timeout_seconds: 15
+
+  - name: financial_analysis_agent
+    class_path: agents.financial_analysis_agent.FinancialAnalysisAgent
+    description: Performs complex financial analysis using SQL queries and vector searches
+    capabilities:
+      - postgresql_queries
+      - vector_search
+      - statistical_analysis
+      - pattern_recognition
+      - external_data_integration
+    required_for_intents:
+      - analytical
+      - comparative
+      - predictive
+    optional_for_intents:
+      - exploratory
+      - actionable
+    retry_count: 1
+    timeout_seconds: 45
+
+  - name: insight_synthesis_agent
+    class_path: agents.insight_synthesis_agent.InsightSynthesisAgent
+    description: Transforms raw analytical results into coherent, actionable insights
+    capabilities:
+      - natural_language_generation
+      - insight_prioritization
+      - visualization_recommendations
+      - personalization
+      - explanation_generation
+    required_for_intents:
+      - exploratory
+      - analytical
+      - comparative
+      - predictive
+    optional_for_intents:
+      - actionable
+    retry_count: 2
+    timeout_seconds: 30
+
+  - name: recommendation_engine_agent
+    class_path: agents.recommendation_engine_agent.RecommendationEngineAgent
+    description: Generates personalized recommendations for budgeting and cost savings
+    capabilities:
+      - behavioral_analysis
+      - alternative_discovery
+      - budget_optimization
+      - cost_benefit_analysis
+      - goal_alignment
+    required_for_intents:
+      - actionable
+    optional_for_intents:
+      - exploratory
+      - predictive
+    retry_count: 1
+    timeout_seconds: 40
+
+  - name: proactive_insights_agent
+    class_path: agents.proactive_insights_agent.ProactiveInsightsAgent
+    description: Continuously monitors spending data for timely insights and alerts
+    capabilities:
+      - continuous_monitoring
+      - anomaly_detection
+      - timing_optimization
+      - notification_generation
+      - trend_prediction
+    required_for_intents:
+      - predictive
+    optional_for_intents:
+      - exploratory
+      - analytical
+    retry_count: 1
+    timeout_seconds: 25
+
+workflows:
+  - intent_type: analytical
+    description: "Process queries requesting specific calculations, amounts, or data analysis"
+    aggregation_agent: insight_synthesis_agent
+    steps:
+      - step_id: translate_query
+        agent_name: query_translation_agent
+        depends_on: []
+        required: true
+        retry_count: 2
+        input_mapping:
+          query: "original_query"
+          user_context: "user_context"
+
+      - step_id: analyze_data
+        agent_name: financial_analysis_agent
+        depends_on: ["translate_query"]
+        required: true
+        retry_count: 1
+        input_mapping:
+          structured_query: "translate_query.structured_query"
+          analysis_type: "translate_query.analysis_type"
+          user_id: "user_id"
+
+      - step_id: synthesize_insights
+        agent_name: insight_synthesis_agent
+        depends_on: ["analyze_data"]
+        required: true
+        retry_count: 2
+        input_mapping:
+          analysis_results: "analyze_data.results"
+          original_query: "original_query"
+          user_id: "user_id"
+
+  - intent_type: exploratory
+    description: "Process queries exploring trends, patterns, or general insights"
+    aggregation_agent: insight_synthesis_agent
+    steps:
+      - step_id: translate_query
+        agent_name: query_translation_agent
+        depends_on: []
+        required: true
+        retry_count: 2
+        input_mapping:
+          query: "original_query"
+          user_context: "user_context"
+
+      - step_id: analyze_patterns
+        agent_name: financial_analysis_agent
+        depends_on: ["translate_query"]
+        required: true
+        retry_count: 1
+        input_mapping:
+          structured_query: "translate_query.structured_query"
+          analysis_type: "translate_query.analysis_type"
+          user_id: "user_id"
+
+      - step_id: generate_insights
+        agent_name: insight_synthesis_agent
+        depends_on: ["analyze_patterns"]
+        required: true
+        retry_count: 2
+        input_mapping:
+          analysis_results: "analyze_patterns.results"
+          original_query: "original_query"
+          user_id: "user_id"
+
+      - step_id: suggest_recommendations
+        agent_name: recommendation_engine_agent
+        depends_on: ["analyze_patterns"]
+        required: false
+        retry_count: 1
+        input_mapping:
+          spending_analysis: "analyze_patterns.results"
+          user_id: "user_id"
+          exploration_context: "generate_insights.insights"
+
+  - intent_type: actionable
+    description: "Process queries seeking recommendations, advice, or actionable steps"
+    aggregation_agent: insight_synthesis_agent
+    steps:
+      - step_id: translate_query
+        agent_name: query_translation_agent
+        depends_on: []
+        required: true
+        retry_count: 2
+        input_mapping:
+          query: "original_query"
+          user_context: "user_context"
+
+      - step_id: analyze_current_situation
+        agent_name: financial_analysis_agent
+        depends_on: ["translate_query"]
+        required: true
+        retry_count: 1
+        input_mapping:
+          structured_query: "translate_query.structured_query"
+          analysis_type: "translate_query.analysis_type"
+          user_id: "user_id"
+
+      - step_id: generate_recommendations
+        agent_name: recommendation_engine_agent
+        depends_on: ["analyze_current_situation"]
+        required: true
+        retry_count: 1
+        input_mapping:
+          spending_analysis: "analyze_current_situation.results"
+          user_goals: "user_context.financial_goals"
+          user_id: "user_id"
+
+      - step_id: create_action_plan
+        agent_name: insight_synthesis_agent
+        depends_on: ["generate_recommendations", "analyze_current_situation"]
+        required: true
+        retry_count: 2
+        input_mapping:
+          recommendations: "generate_recommendations.recommendations"
+          analysis_results: "analyze_current_situation.results"
+          original_query: "original_query"
+          user_id: "user_id"
+
+  - intent_type: comparative
+    description: "Process queries comparing different time periods, categories, or metrics"
+    aggregation_agent: insight_synthesis_agent
+    steps:
+      - step_id: translate_query
+        agent_name: query_translation_agent
+        depends_on: []
+        required: true
+        retry_count: 2
+        input_mapping:
+          query: "original_query"
+          user_context: "user_context"
+
+      - step_id: perform_comparison
+        agent_name: financial_analysis_agent
+        depends_on: ["translate_query"]
+        required: true
+        retry_count: 1
+        input_mapping:
+          structured_query: "translate_query.structured_query"
+          comparison_type: "translate_query.comparison_type"
+          time_periods: "translate_query.time_periods"
+          user_id: "user_id"
+
+      - step_id: interpret_comparison
+        agent_name: insight_synthesis_agent
+        depends_on: ["perform_comparison"]
+        required: true
+        retry_count: 2
+        input_mapping:
+          comparison_results: "perform_comparison.results"
+          original_query: "original_query"
+          user_id: "user_id"
+
+  - intent_type: predictive
+    description: "Process queries about future projections, forecasts, or predictions"
+    aggregation_agent: insight_synthesis_agent
+    steps:
+      - step_id: translate_query
+        agent_name: query_translation_agent
+        depends_on: []
+        required: true
+        retry_count: 2
+        input_mapping:
+          query: "original_query"
+          user_context: "user_context"
+
+      - step_id: analyze_historical_data
+        agent_name: financial_analysis_agent
+        depends_on: ["translate_query"]
+        required: true
+        retry_count: 1
+        input_mapping:
+          structured_query: "translate_query.structured_query"
+          analysis_type: "translate_query.analysis_type"
+          user_id: "user_id"
+
+      - step_id: generate_predictions
+        agent_name: proactive_insights_agent
+        depends_on: ["analyze_historical_data"]
+        required: true
+        retry_count: 1
+        input_mapping:
+          historical_analysis: "analyze_historical_data.results"
+          prediction_context: "translate_query.prediction_context"
+          user_id: "user_id"
+
+      - step_id: create_forecast_report
+        agent_name: insight_synthesis_agent
+        depends_on: ["generate_predictions", "analyze_historical_data"]
+        required: true
+        retry_count: 2
+        input_mapping:
+          predictions: "generate_predictions.predictions"
+          historical_context: "analyze_historical_data.results"
+          original_query: "original_query"
+          user_id: "user_id"
