@@ -33,6 +33,13 @@ uvicorn server.run:app --host 0.0.0.0 --port 8000
 
 ## Must have firebase-sdk.json file in root
 ```
+## Scripts
+For market_analytics.py you need to add the gcp project id and bigquery table to your terminal
+"$env:GCP_PROJECT_ID="your-gcp-project-id"
+export GCP_PROJECT_ID="your-gcp-project-id"
+
+"$env:TABLE="your table name"
+export TABLE="your table name"
 
 <details>
 <summary><strong>📁 Project Structure</strong></summary>
