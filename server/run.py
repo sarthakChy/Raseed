@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from google.cloud import firestore, storage
 from utils.google_services_utils import initialize_firestore, initialize_gcs_client
 from server.utils.storage_utils import save_receipt_to_cloud
+from server.utils.fetch_data_utils import fetch_user_data_by_email
 import requests as req
 import uuid
 import asyncio
@@ -214,15 +215,23 @@ async def analyze_insights(
     ):
     try:
         
-        # Load local items.json each time the endpoint is hit
-        with open("items.json", "r", encoding="utf-8") as f:
-            sample_data = json.load(f)
+        # --- Extract user info from Firebase token ---
+        user = request.state.user
+        email = user.get("email")
+
+        if not email:
+            return JSONResponse(content={}, status_code=200)
+
+        # --- Fetch all receipts from Firestore ---
+        receipts = fetch_user_data_by_email(db, email)
+        if not receipts:
+            return JSONResponse(content={}, status_code=200)
         
         # Initialize agent
         agent = PurchaseInsightsAgent(project_id=PROJECT_ID)
 
         # Run analysis
-        results = agent.analyze_purchases(sample_data)
+        results = agent.analyze_purchases(receipts)
 
         # Return as JSON
         return JSONResponse(content=results.model_dump(), status_code=200)
