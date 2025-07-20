@@ -12,40 +12,13 @@ import logging
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-# Pydantic models
-class ReceiptItem(BaseModel):
-    name: str
-    price: str
-
-# # class ReceiptData(BaseModel):
-#     store_name: str
-#     total_amount: str
-#     date: Optional[str] = None
-#     category: Optional[str] = "Groceries"
-#     items: Optional[List[ReceiptItem]] = []
-
-class UpdatePassData(BaseModel):
-    insights: Optional[str] = None
-    additional_info: Optional[Dict[str, Any]] = None
-
-class WalletPassResponse(BaseModel):
-    success: bool
-    message: str
-    object_id: Optional[str] = None
-    wallet_link: Optional[str] = None
-    error: Optional[str] = None
-
-class HealthResponse(BaseModel):
-    status: str
-    service: str
-    timestamp: str
 
 class ReceiptWalletManager:
     """Manages Google Wallet passes for receipts in RASEED app."""
     
     def __init__(self):
         self.key_file_path = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS', '/home/sarthak/Desktop/Raseed/server/serviceAccountKey.json')
-        self.issuer_id = os.environ.get('GOOGLE_WALLET_ISSUER_ID','3388000000022970942')
+        self.issuer_id = os.environ.get('GOOGLE_WALLET_ISSUER_ID')
         self.base_domain = os.environ.get('RASEED_DOMAIN', 'Raseed.com')
         self.auth()
     
@@ -125,23 +98,22 @@ class ReceiptWalletManager:
             logger.error(f'Error creating class: {e}')
             return class_id
     
-    async def create_receipt_pass(self, receipt_data: dict) -> Dict[str, Any]:
+    async def create_receipt_pass(self, receipt_data: dict,uuid:str) -> Dict[str, Any]:
         """Create a Google Wallet pass for a receipt."""
         
         # Generate unique identifiers
-        object_suffix = f"receipt_{uuid.uuid4().hex[:8]}"
         class_suffix = "receipt_class"
         
         # Ensure class exists
         class_id = self.create_receipt_class(class_suffix)
-        object_id = f'{self.issuer_id}.{object_suffix}'
+        object_id = f'{self.issuer_id}.{uuid}'
         
         # Parse receipt data
-        store_name = receipt_data['store_name']
-        date = receipt_data['date'] or datetime.now().strftime('%B %d, %Y')
-        total_amount = receipt_data['total_amount']
+        store_name = receipt_data['merchantName']
+        date = receipt_data['transactionDate'] or datetime.now().strftime('%B %d, %Y')
+        total_amount = receipt_data['total']
         items = receipt_data['items'] or []
-        category = receipt_data['category']
+        category = receipt_data['category'] if 'category' in receipt_data else 'General'
         
         # Create items text for display
         items_text = ""
@@ -157,17 +129,6 @@ class ReceiptWalletManager:
             'id': object_id,
             'classId': class_id,
             'state': 'ACTIVE',
-            'heroImage': {
-                'sourceUri': {
-                    'uri': 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=400&h=200&fit=crop'
-                },
-                'contentDescription': {
-                    'defaultValue': {
-                        'language': 'en-US',
-                        'value': 'Receipt hero image'
-                    }
-                }
-            },
             'logo': {
                 'sourceUri': {
                     'uri': 'https://storage.googleapis.com/wallet-lab-tools-codelab-artifacts-public/pass_google_logo.jpg'
@@ -189,6 +150,17 @@ class ReceiptWalletManager:
                 'defaultValue': {
                     'language': 'en-US',
                     'value': f'Receipt - {date}'
+                }
+            },
+            'heroImage': {
+                'sourceUri': {
+                    'uri': 'https://storage.googleapis.com/wallet-lab-tools-codelab-artifacts-public/google-io-hero-demo-only.png'
+                },
+                'contentDescription': {
+                    'defaultValue': {
+                        'language': 'en-US',
+                        'value': 'Receipt hero image'
+                    }
                 }
             },
             'textModulesData': [
@@ -234,8 +206,7 @@ class ReceiptWalletManager:
             },
             'barcode': {
                 'type': 'QR_CODE',
-                'value': f'RASEED_RECEIPT_{object_suffix}',
-                'alternateText': object_suffix
+                'value': " ",
             },
             'hexBackgroundColor': '#4285f4',
             'validTimeInterval': {
@@ -246,7 +217,7 @@ class ReceiptWalletManager:
                     'date': (datetime.now() + timedelta(days=365)).isoformat() + 'Z'
                 }
             },
-            'smartTapRedemptionValue': f'RASEED_{object_suffix}',
+            'smartTapRedemptionValue': f'RASEED_{uuid}',
             'hasUsers': True
         }
         
@@ -293,31 +264,20 @@ class ReceiptWalletManager:
         
         return f'https://pay.google.com/gp/v/save/{token}'
     
-    async def update_wallet_pass(self, object_id: str, update_data: UpdatePassData) -> Dict[str, Any]:
+    async def update_wallet_pass(self, object_id: str, update_data) -> Dict[str, Any]:
         """Update an existing wallet pass with new information."""
         try:
             patch_body = {}
             
-            if update_data.insights:
+            if update_data['insights']:
                 # Add AI insights to the pass
                 patch_body['textModulesData'] = [
                     {
                         'id': 'ai_insights',
                         'header': 'AI Insights & Tips',
-                        'body': update_data.insights
+                        'body': update_data['insights']
                     }
                 ]
-            
-            if update_data.additional_info:
-                # Add any additional information
-                for key, value in update_data.additional_info.items():
-                    if 'textModulesData' not in patch_body:
-                        patch_body['textModulesData'] = []
-                    patch_body['textModulesData'].append({
-                        'id': f'additional_{key}',
-                        'header': key.replace('_', ' ').title(),
-                        'body': str(value)
-                    })
             
             response = self.client.genericobject().patch(
                 resourceId=object_id,

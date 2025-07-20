@@ -87,3 +87,25 @@ class PurchaseInsightsOutput(BaseModel):
     ai_analysis: AIAnalysis
     data_summary: DataSummary
     daily_patterns: List[DailySpendingPattern]
+
+class ReceiptItem(BaseModel):
+    name: str
+    price: str
+
+class ReceiptData(BaseModel):
+    store_name: str
+    total_amount: str
+    date: Optional[str] = None
+    category: Optional[str] = "Groceries"
+    items: Optional[List[ReceiptItem]] = []
+
+class UpdatePassData(BaseModel):
+    insights: Optional[str] = None
+    additional_info: Optional[Dict[str, Any]] = None
+
+class WalletPassResponse(BaseModel):
+    success: bool
+    message: str
+    object_id: Optional[str] = None
+    wallet_link: Optional[str] = None
+    error: Optional[str] = None

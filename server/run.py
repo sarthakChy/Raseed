@@ -14,7 +14,6 @@ import requests as req
 import uuid
 import asyncio
 import logging
-import uuid
 import time
 import sys
 import os
@@ -45,12 +44,12 @@ import vertexai
 import firebase_admin
 from firebase_admin import credentials, auth
 
-from utils.utils import get_credentials,parse_json,initialize_firestore, initialize_gcs_client
+from utils.utils import get_credentials,parse_json,initialize_firestore, initialize_gcs_client,save_receipt_to_cloud
 
 from agents.insights_agent import PurchaseInsightsAgent
 from agents.receipt.receipts_agent import ReceiptAgent
-from agents.wallet_agent import ReceiptWalletManager, WalletPassResponse, UpdatePassData, HealthResponse
-from server.utils.storage_utils import save_receipt_to_cloud
+from agents.wallet_agent import ReceiptWalletManager
+from models.pydantic_models import  WalletPassResponse, UpdatePassData
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -142,8 +141,7 @@ async def analyze_receipt(
         # Analyze the receipt
         response = agent.analyze()
         parsed_data = parse_json(response.text) 
-            
-        
+
         #Save the receipt to cloud storage and Firestore
         final_data = save_receipt_to_cloud(
                     db=db,
@@ -151,7 +149,8 @@ async def analyze_receipt(
                     parsed_data=parsed_data,
                     image_bytes=user_image_bytes, 
                     file=file,
-                    user_id=None 
+                    user_id=None,
+                    uuid = str(uuid.uuid4()) #Generate a new UUID for the receipt 
                 )
 
         return JSONResponse(content=final_data, status_code=200)
@@ -213,10 +212,11 @@ async def analyze_insights(
 
 wallet_manager = ReceiptWalletManager()
 
-@app.post("/receipts/create-wallet-pass", response_model=WalletPassResponse)
+@app.post("/receipts/create-wallet-pass")
 async def create_wallet_pass(
     request: Request,
-    auth=Depends(firebase_auth_required)
+    auth=Depends(firebase_auth_required),
+    body: dict = Body(...),
 ):
     """
     Create a Google Wallet pass for a receipt.
@@ -227,96 +227,79 @@ async def create_wallet_pass(
     try:
         
         # Create wallet pass
-        receipt_data = await request.body()
-        logger.info(f"Creating wallet pass with data: {parse_json(receipt_data)}")
-        result = await wallet_manager.create_receipt_pass(parse_json(receipt_data))
+        logger.info(f"Received UUID: {body.get('uuid')}")
+
+        uuid = body.get('uuid')
+
+        doc_ref = db.collection("receipts").where("uuid", "==", uuid).get()
+
+        receipt_data = doc_ref[0].to_dict()
+
+        logger.info(f"Retrieved receipt data for UUID {uuid}: {receipt_data}")
+
+        result = await wallet_manager.create_receipt_pass(receipt_data,uuid)
         
         if result['success']:
-            return WalletPassResponse(
-                success=True,
-                message="Wallet pass created successfully",
-                object_id=result['object_id'],
-                wallet_link=result['wallet_link']
-            )
+            return result
         else:
             logger.error(f"Failed to create wallet pass: {result.get('error', 'Unknown error')}")
     except Exception as e:
         logger.error(f"Internal error creating wallet pass: {e}")
 
-# @app.patch("/receipts/update-wallet-pass/{object_id}", response_model=WalletPassResponse)
-# async def update_wallet_pass(object_id: str, update_data: UpdatePassData):
-#     """
-#     Update an existing Google Wallet pass with new information.
+@app.patch("/receipts/update-wallet-pass")
+async def update_wallet_pass(
+    request: Request,
+    auth=Depends(firebase_auth_required),
+    body:dict = Body(...)
+):
+    """
+    Update an existing Google Wallet pass with new information.
     
-#     This can be used to add AI-generated insights, spending tips, or other
-#     dynamic content to existing wallet passes.
-#     """
-#     try:
-#         if not object_id.strip():
-#             raise HTTPException(
-#                 status_code=status.HTTP_400_BAD_REQUEST,
-#                 detail="Object ID is required"
-#             )
+    This can be used to add AI-generated insights, spending tips, or other
+    dynamic content to existing wallet passes.
+    """
+    try:
         
-#         result = await wallet_manager.update_wallet_pass(object_id, update_data)
-        
-#         if result['success']:
-#             return WalletPassResponse(
-#                 success=True,
-#                 message="Wallet pass updated successfully",
-#                 object_id=object_id
-#             )
-#         else:
-#             raise HTTPException(
-#                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-#                 detail=result.get('error', 'Failed to update wallet pass')
-#             )
-            
-#     except HTTPException:
-#         raise
-#     except Exception as e:
-#         logger.error(f"Unexpected error updating wallet pass: {e}")
-#         raise HTTPException(
-#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-#             detail=str(e)
-#         )
+        uuid = body.get('uuid')
 
-# @app.post("/receipts/expire-wallet-pass/{object_id}", response_model=WalletPassResponse)
-# async def expire_wallet_pass(object_id: str):
-#     """
-#     Expire a Google Wallet pass.
+        object_id = f"{GOOGLE_WALLET_ISSUER_ID}.{uuid}"
+
+        result = await wallet_manager.update_wallet_pass(object_id, body)
+        
+        if result['success']:
+            return result
+        else:
+            logging.error(f"Failed to update pass")
+
+    except Exception as e:
+        logger.error(f"Unexpected error updating wallet pass: {e}")
+
+@app.post("/receipts/expire-wallet-pass")
+async def expire_wallet_pass(
+    request: Request,
+    auth=Depends(firebase_auth_required),
+    body:dict = Body(...)
+):
+    """
+    Expire a Google Wallet pass.
     
-#     This marks the wallet pass as expired, which will update its status
-#     in the user's Google Wallet app.
-#     """
-#     try:
-#         if not object_id.strip():
-#             raise HTTPException(
-#                 status_code=status.HTTP_400_BAD_REQUEST,
-#                 detail="Object ID is required"
-#             )
+    This marks the wallet pass as expired, which will update its status
+    in the user's Google Wallet app.
+    """
+    try:            
         
-#         result = await wallet_manager.expire_wallet_pass(object_id)
-        
-#         if result['success']:
-#             return WalletPassResponse(
-#                 success=True,
-#                 message="Wallet pass expired successfully",
-#                 object_id=object_id
-#             )
-#         else:
-#             raise HTTPException(
-#                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-#                 detail=result.get('error', 'Failed to expire wallet pass')
-#             )
-            
-#     except HTTPException:
-#         raise
-#     except Exception as e:
-#         logger.error(f"Unexpected error expiring wallet pass: {e}")
-#         raise HTTPException(
-#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-#             detail=str(e)
-#         )
+        uuid = body.get('uuid')
 
+        object_id = f"{GOOGLE_WALLET_ISSUER_ID}.{uuid}"
+        
+        result = await wallet_manager.expire_wallet_pass(object_id)
+        
+        if result['success']:
+            return result
+        else:
+            logging.error("Failed to expire pass")
+            
+    
+    except Exception as e:
+        logger.error(f"Unexpected error expiring wallet pass: {e}")
 

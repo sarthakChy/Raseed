@@ -14,9 +14,7 @@ NUM_DAYS_HISTORY = 90 # Generate receipts over the last 90 days
 # --- Mock Data Pools ---
 MOCK_USERS = [
     {"userId": "user_alice_123", "email": "alice@example.com"},
-    {"userId": "user_bob_456", "email": "bob@example.com"},
-    {"userId": "user_charlie_789", "email": "charlie@example.com"},
-    {"userId": "user_dave_012", "email": "dave@example.com"},
+    {"userId": "aryannkaushikk", "email": "aryan.kaushik2015@yahoo.com"},
 ]
 
 # --- UPDATED: Defined staple items that users will buy repeatedly ---
