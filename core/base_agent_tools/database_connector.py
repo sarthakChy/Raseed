@@ -7,6 +7,7 @@ import json
 import hashlib
 from dataclasses import dataclass
 from contextlib import asynccontextmanager
+from decimal import Decimal
 
 from google.cloud import secretmanager
 import redis.asyncio as redis
@@ -317,19 +318,19 @@ class DatabaseConnector:
         # Execute query
         try:
             async with self.pool.acquire() as conn:
-                if parameters:
-                    if isinstance(parameters, dict):
-                        # Named parameters - convert to positional
-                        param_values = list(parameters.values())
-                        rows = await conn.fetch(query, *param_values)
-                    else:
-                        # Positional parameters
-                        rows = await conn.fetch(query, *parameters)
-                else:
-                    rows = await conn.fetch(query)
+                param_values = parameters or []
+                rows = await conn.fetch(query, *param_values)
                 
-                # Convert to dictionaries
-                data = [dict(row) for row in rows]
+                # --- THIS IS THE KEY CHANGE ---
+                # Convert rows to dictionaries and handle Decimal types
+                data = []
+                for row in rows:
+                    row_dict = dict(row)
+                    for key, value in row_dict.items():
+                        if isinstance(value, Decimal):
+                            row_dict[key] = float(value)
+                    data.append(row_dict)
+
                 execution_time = (datetime.now() - start_time).total_seconds()
                 
                 result = QueryResult(
@@ -339,15 +340,10 @@ class DatabaseConnector:
                     query_hash=hashlib.md5(query.encode()).hexdigest()[:16]
                 )
                 
-                # Cache the result
                 if use_cache and len(data) > 0:
                     await self._cache_result(cache_key, result)
                 
-                self.logger.info(
-                    f"Query executed: {result.row_count} rows, "
-                    f"{result.execution_time:.3f}s"
-                )
-                
+                self.logger.info(f"Query executed: {result.row_count} rows, {result.execution_time:.3f}s")
                 return result
                 
         except Exception as e:
