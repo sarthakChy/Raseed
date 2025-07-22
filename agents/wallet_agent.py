@@ -17,7 +17,7 @@ class ReceiptWalletManager:
     """Manages Google Wallet passes for receipts in RASEED app."""
     
     def __init__(self):
-        self.key_file_path = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS', '/home/sarthak/Desktop/Raseed/server/serviceAccountKey.json')
+        self.key_file_path = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
         self.issuer_id = os.environ.get('GOOGLE_WALLET_ISSUER_ID')
         self.base_domain = os.environ.get('RASEED_DOMAIN', 'Raseed.com')
         self.auth()
@@ -264,39 +264,46 @@ class ReceiptWalletManager:
         
         return f'https://pay.google.com/gp/v/save/{token}'
     
-    async def update_wallet_pass(self, object_id: str, update_data) -> Dict[str, Any]:
-        """Update an existing wallet pass with new information."""
-        try:
-            patch_body = {}
-            
-            if update_data['insights']:
-                # Add AI insights to the pass
-                patch_body['textModulesData'] = [
-                    {
-                        'id': 'ai_insights',
-                        'header': 'AI Insights & Tips',
-                        'body': update_data['insights']
-                    }
-                ]
-            
-            response = self.client.genericobject().patch(
-                resourceId=object_id,
-                body=patch_body
-            ).execute()
-            
-            logger.info(f'Wallet pass updated successfully: {object_id}')
-            return {
-                'success': True,
-                'object_id': object_id,
-                'response': response
-            }
-            
-        except HttpError as e:
-            logger.error(f'Error updating wallet pass: {e}')
-            return {
-                'success': False,
-                'error': str(e)
-            }
+    async def update_wallet_pass(self, object_id: str, update_data: UpdatePassData) -> Dict[str, Any]:
+    """Update an existing wallet pass by preserving all existing fields and adding insights."""
+    try:
+        
+        current_pass = self.client.genericobject().get(resourceId=object_id).execute()
+
+        patch_body = current_pass.copy()
+
+        text_modules = patch_body.get("textModulesData", [])
+
+        insights_module = {
+            'id': 'ai_insights',
+            'header': 'AI Insights & Tips',
+            'body': update_data['insights']
+        }
+
+        text_modules = [m for m in text_modules if m.get('id') != 'ai_insights']
+        text_modules.append(insights_module)
+
+        patch_body['textModulesData'] = text_modules
+
+        response = self.client.genericobject().patch(
+            resourceId=object_id,
+            body=patch_body
+        ).execute()
+
+        logger.info(f'Wallet pass updated successfully: {object_id}')
+        return {
+            'success': True,
+            'object_id': object_id,
+            'response': response
+        }
+
+    except HttpError as e:
+        logger.error(f'Error updating wallet pass: {e}')
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
     
     async def expire_wallet_pass(self, object_id: str) -> Dict[str, Any]:
         """Expire a wallet pass."""

@@ -21,7 +21,7 @@ class ReceiptAgent:
             file_bytes: The actual bytes of the receipt image.
             file_content_type: The MIME type of the image file (e.g., "image/jpeg").
         """
-        self.model = GenerativeModel("gemini-2.0-flash",system_instruction=SYSTEM_INSTRUCTION)
+        self.model = GenerativeModel("gemini-2.0-flash-001",system_instruction=SYSTEM_INSTRUCTION)
 
         self.user_image_bytes = file_bytes
         self.file_content_type = file_content_type
@@ -65,12 +65,6 @@ class ReceiptAgent:
                     top_k=40,
                     max_output_tokens=2048,
                 ),
-                safety_settings={
-                    HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
-                    HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
-                    HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
-                    HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
-                }
             )
             logger.info("generate_content call completed.")
 
