@@ -49,7 +49,7 @@ function CaptureReceiptPage({ user, onBack }) {
             }
          
             const result = await response.json(); 
-            localStorage.setItem('uuid', result.uuid); // Store the UUID in localStorage
+            localStorage.setItem('uuid', result.receiptId); // Store the UUID in localStorage
             setAnalysisResult(result);
         } catch (err) {
             setError(err.message);

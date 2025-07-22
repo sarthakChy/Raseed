@@ -14,43 +14,134 @@ from typing import Dict, Any
 
 logger = logging.getLogger(__name__)
 
+from typing import Dict, Any
+from google.cloud import firestore, storage
+from fastapi import UploadFile
+import logging, uuid, random
+from datetime import datetime, timedelta
+
 def save_receipt_to_cloud(
     db: firestore.Client, 
     bucket: storage.Bucket, 
     parsed_data: Dict[str, Any], 
     image_bytes: bytes, 
     file: UploadFile,
-    user_id: str = None,
-    uuid: str = None
+    uploadedAt,
+    processedAt,
+    uuid: str,
+    user_id: str = 'user_sarthak_2314',
+    email: str = 'choudharysarthak.6@gmail.com',
+    
 ) -> Dict[str, Any]:
     """
     Uploads a receipt image to GCS and saves its data to Firestore.
     Returns a JSON-serializable dictionary.
     """
     try:
-        # --- Step 1: Upload Image to Cloud Storage (No Change) ---
+        # 1. Upload image to GCS
         unique_filename = f"receipts/{user_id or 'anonymous'}/{uuid}-{file.filename}"
         blob = bucket.blob(unique_filename)
         blob.upload_from_string(image_bytes, content_type=file.content_type)
         logging.info(f"Image uploaded to {unique_filename}.")
 
-        # --- Step 2: Prepare and Save Data to Firestore ---
-        doc_ref = db.collection("receipts").document()
-        
-        # This dictionary is for Firestore, which understands datetime objects
-        firestore_data = parsed_data.copy()
-        firestore_data['uuid'] = uuid
-        firestore_data['userId'] = 'anonymous' if user_id is None else user_id
-        firestore_data['gcs_uri'] = f"gs://{bucket.name}/{unique_filename}"
-        
-        doc_ref.set(firestore_data)
-        logging.info(f"Data saved to Firestore with ID: {doc_ref.id}")
-        # Return the JSON-serializable dictionary
-        return firestore_data
+        # 2. Check if user exists
+        users_ref = db.collection("users")
+        query = users_ref.where("userId", "==", user_id)
+        results = query.get()
+        user_doc = results[0] if results else None
+
+        current_time = datetime.utcnow().isoformat()
+
+        if not user_doc:
+            # Create user data , needs to be done at correct endpoint
+            display_name = email.split("@")[0].capitalize()
+
+            user_data = {
+                "userId": user_id,
+                "email": email,
+                "displayName": display_name,
+                "photoURL": f"https://api.dicebear.com/8.x/initials/svg?seed={display_name}",
+                "createdAt": current_time,
+                "lastLoginAt": current_time,
+                "preferences": {
+                    "currency": "USD",
+                    "language": "en",
+                    "timezone": "America/New_York",
+                    "notifications": {
+                        "pushEnabled": True,
+                        "emailEnabled": False,
+                        "budgetAlerts": True,
+                        "spendingInsights": True,
+                        "weeklyReports": False,
+                        "proactiveInsights": True,
+                        "frequency": "daily"
+                    },
+                    "privacySettings": {
+                        "shareData": False,
+                        "anonymousAnalytics": True
+                    }
+                },
+                "financialProfile": {
+                    "monthlyIncome": random.choice([50000, 75000, 100000]),
+                    "budgetLimits": {
+                        "total": random.randint(35000, 50000),
+                        "groceries": random.randint(12000, 18000),
+                        "dining": random.randint(6000, 12000),
+                        "entertainment": random.randint(3000, 8000),
+                        "transportation": random.randint(5000, 10000),
+                        "shopping": random.randint(5000, 15000),
+                        "utilities": random.randint(3000, 8000),
+                        "healthcare": random.randint(2000, 6000),
+                        "other": random.randint(3000, 8000)
+                    },
+                    "financialGoals": [
+                        {
+                            "id": str(uuid.uuid4()),
+                            "type": "saving",
+                            "targetAmount": random.choice([100000, 250000, 500000]),
+                            "currentAmount": random.randint(10000, 200000),
+                            "deadline": (datetime.utcnow() + timedelta(days=random.randint(30, 365))).isoformat(),
+                            "category": random.choice(["Travel", "Emergency Fund", "Car"]),
+                            "priority": "high"
+                        }
+                    ],
+                    "riskTolerance": random.choice(["Low", "Moderate", "High"])
+                }
+            }
+            # Save user to Firestore
+            db.collection("users").document().set(user_data)
+            logging.info(f"User created with userId: {user_id}")
+
+        else:
+            # Optional: update lastLoginAt or any other user activity, needs to be done at correct endpoint
+            db.collection("users").document(user_doc.id).update({
+                "lastLoginAt": current_time
+            })
+
+            logging.info(f"Existing user {user_id} updated.")
+
+        # 3. Save receipt
+        receipt_data = {
+            'receiptId': uuid,
+            'userId': user_id,
+            'uploadedAt': uploadedAt.isoformat(),
+            'processedAt': processedAt.isoformat(),
+            'status': "completed",
+            'ocrData': parsed_data.copy(),
+            'gcsUri': f"gs://{bucket.name}/{unique_filename}",
+            'processingErrors': [],
+            'retryCount': 0,
+            'walletPass': {}
+        }
+
+        db.collection("receiptQueue").document().set(receipt_data)
+        logging.info(f"Receipt saved to Firestore with ID: {receipt_data['receiptId']}")
+
+        return receipt_data
 
     except Exception as e:
         logging.error(f"Error in save_receipt_to_cloud: {e}")
-        raise e
+        raise
 
 def get_credentials():
     """Load credentials from environment variables."""

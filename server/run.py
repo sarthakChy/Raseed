@@ -133,27 +133,33 @@ async def analyze_receipt(
     try:    
         #Reads fils bytes   
         user_image_bytes = await file.read()
+
+        uploadedAt = datetime.now()
+
         #Initialize the ReceiptAgent
         agent = ReceiptAgent(
                         file_bytes=user_image_bytes,
                         file_content_type=file.content_type,
                     )
+        
         # Analyze the receipt
         response = agent.analyze()
+        processedAt = datetime.now()
         parsed_data = parse_json(response.text) 
 
         #Save the receipt to cloud storage and Firestore
-        final_data = save_receipt_to_cloud(
+        receipt_data = save_receipt_to_cloud(
                     db=db,
                     bucket=bucket,
                     parsed_data=parsed_data,
                     image_bytes=user_image_bytes, 
                     file=file,
-                    user_id=None,
-                    uuid = str(uuid.uuid4()) #Generate a new UUID for the receipt 
+                    uploadedAt = uploadedAt,
+                    processedAt = processedAt,
+                    uuid = str(uuid.uuid4()),
                 )
 
-        return JSONResponse(content=final_data, status_code=200)
+        return JSONResponse(content=receipt_data, status_code=200)
     except Exception as e:
         logging.error(f"Receipt analysis error: {e}")
         traceback.print_exc()
