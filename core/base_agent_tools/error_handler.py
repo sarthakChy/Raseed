@@ -5,7 +5,6 @@ from datetime import datetime
 import json
 from enum import Enum
 
-
 class ErrorSeverity(Enum):
     LOW = "low"
     MEDIUM = "medium"
@@ -23,20 +22,8 @@ class ErrorType(Enum):
     AUTHORIZATION = "authorization"
     TOOL_EXECUTION = "tool_execution"
 
-
 class ErrorHandler:
-    """
-    Centralized error handling and logging for all agents.
-    Provides graceful degradation, fallback responses, and comprehensive error tracking.
-    """
-    
     def __init__(self, logger: logging.Logger):
-        """
-        Initialize the error handler.
-        
-        Args:
-            logger: Logger instance for this handler
-        """
         self.logger = logger
         self.error_history = []
         self.fallback_responses = {
@@ -56,44 +43,26 @@ class ErrorHandler:
         error_type: Optional[ErrorType] = None,
         severity: ErrorSeverity = ErrorSeverity.MEDIUM
     ) -> Dict[str, Any]:
-        """
-        Handle an error with logging, categorization, and fallback response.
-        
-        Args:
-            error: The exception that occurred
-            context: Context description of where the error occurred
-            user_id: User ID if applicable
-            error_type: Type of error for categorization
-            severity: Severity level of the error
-            
-        Returns:
-            Dictionary with error handling results and fallback response
-        """
-        # Determine error type if not provided
         if error_type is None:
             error_type = self._classify_error(error)
         
-        # Create error record
+        # Use 'error_message' instead of 'message' to avoid LogRecord conflict
         error_record = {
             "timestamp": datetime.now().isoformat(),
             "error_type": error_type.value,
             "severity": severity.value,
-            "message": str(error),
+            "error_message": str(error),  # Changed from 'message' to 'error_message'
             "context": context,
             "user_id": user_id,
             "traceback": traceback.format_exc(),
             "error_class": error.__class__.__name__
         }
         
-        # Log error based on severity
         self._log_error(error_record)
-        
-        # Store in error history (keep last 100 errors)
         self.error_history.append(error_record)
         if len(self.error_history) > 100:
             self.error_history.pop(0)
         
-        # Generate fallback response
         fallback_response = self._generate_fallback_response(error_type, context)
         
         return {
@@ -105,19 +74,11 @@ class ErrorHandler:
         }
     
     def log_error(self, error_type: str, message: str, context: Dict[str, Any]):
-        """
-        Log a custom error message.
-        
-        Args:
-            error_type: Type of error
-            message: Error message
-            context: Additional context
-        """
         error_record = {
             "timestamp": datetime.now().isoformat(),
             "error_type": error_type,
             "severity": "medium",
-            "message": message,
+            "error_message": message,  # Changed from 'message' to 'error_message'
             "context": context
         }
         
@@ -125,7 +86,6 @@ class ErrorHandler:
         self.error_history.append(error_record)
     
     def _classify_error(self, error: Exception) -> ErrorType:
-        """Classify an error based on its type and characteristics."""
         error_class = error.__class__.__name__.lower()
         error_message = str(error).lower()
         
@@ -145,9 +105,8 @@ class ErrorHandler:
             return ErrorType.SYSTEM
     
     def _log_error(self, error_record: Dict[str, Any]):
-        """Log error based on severity level."""
         severity = error_record.get("severity", "medium")
-        message = f"[{error_record['error_type']}] {error_record['message']} | Context: {error_record['context']}"
+        message = f"[{error_record['error_type']}] {error_record['error_message']} | Context: {error_record['context']}"
         
         if severity == "critical":
             self.logger.critical(message, extra=error_record)
@@ -159,17 +118,14 @@ class ErrorHandler:
             self.logger.info(message, extra=error_record)
     
     def _generate_error_id(self, error_record: Dict[str, Any]) -> str:
-        """Generate a unique error ID for tracking."""
         timestamp = error_record["timestamp"].replace(":", "").replace("-", "").replace(".", "")
         error_type = error_record["error_type"][:3].upper()
         return f"{error_type}-{timestamp[-8:]}"
     
     def _generate_fallback_response(self, error_type: ErrorType, context: str) -> str:
-        """Generate an appropriate fallback response for the user."""
         base_response = self.fallback_responses.get(error_type, 
             "I encountered an unexpected issue. Please try again.")
         
-        # Add context-specific information if helpful
         if "query" in context.lower():
             base_response += " You might try rephrasing your question."
         elif "data" in context.lower():
@@ -178,7 +134,6 @@ class ErrorHandler:
         return base_response
     
     def _should_suggest_retry(self, error_type: ErrorType) -> bool:
-        """Determine if a retry should be suggested to the user."""
         transient_errors = {
             ErrorType.DATABASE,
             ErrorType.API,
@@ -187,7 +142,6 @@ class ErrorHandler:
         return error_type in transient_errors
     
     def _generate_user_message(self, error_type: ErrorType, context: str) -> str:
-        """Generate a user-friendly error message."""
         if error_type == ErrorType.VALIDATION:
             return "Please check your input and try again."
         elif error_type == ErrorType.DATABASE:
@@ -198,17 +152,14 @@ class ErrorHandler:
             return "We're working to resolve a technical issue."
     
     def get_error_stats(self) -> Dict[str, Any]:
-        """Get statistics about recent errors."""
         if not self.error_history:
             return {"total_errors": 0, "error_types": {}, "recent_errors": []}
         
-        # Count errors by type
         error_types = {}
         for error in self.error_history:
             error_type = error["error_type"]
             error_types[error_type] = error_types.get(error_type, 0) + 1
         
-        # Get recent errors (last 10)
         recent_errors = self.error_history[-10:]
         
         return {
@@ -219,27 +170,16 @@ class ErrorHandler:
         }
     
     def clear_error_history(self):
-        """Clear the error history (useful for testing or maintenance)."""
         self.error_history.clear()
         self.logger.info("Error history cleared")
     
     def is_service_degraded(self, error_threshold: int = 5) -> bool:
-        """
-        Check if the service is experiencing degraded performance.
-        
-        Args:
-            error_threshold: Number of recent errors that indicate degradation
-            
-        Returns:
-            True if service appears degraded
-        """
         if len(self.error_history) < error_threshold:
             return False
         
-        # Check last 10 minutes for error concentration
-        recent_cutoff = datetime.now().timestamp() - 600  # 10 minutes ago
+        recent_cutoff = datetime.now().timestamp() - 600
         recent_errors = [
-            error for error in self.error_history[-20:]  # Last 20 errors
+            error for error in self.error_history[-20:]
             if datetime.fromisoformat(error["timestamp"]).timestamp() > recent_cutoff
         ]
         

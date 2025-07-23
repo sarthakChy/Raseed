@@ -25,7 +25,7 @@ agents:
       - vector_search
       - statistical_analysis
       - pattern_recognition
-      - external_data_integration
+      # - external_data_integration
     required_for_intents:
       - analytical
       - comparative
@@ -89,6 +89,26 @@ agents:
     retry_count: 1
     timeout_seconds: 25
 
+# workflows:
+#   - intent_type: analytical
+#     description: "Analyze user's spending and provide insights"
+#     aggregation_agent: null  # or "synthesis_agent" if you have one
+#     steps:
+#       - step_id: translate_query
+#         agent_name: query_translation_agent
+#         depends_on: []
+#         input_mapping:
+#           query: original_query
+#         required: true
+#         retry_count: 1
+
+#       - step_id: analyze_spending
+#         agent_name: financial_analysis_agent
+#         depends_on: ["translate_query"]
+#         input_mapping:
+#           structured_query: translate_query.structured_query
+#         required: true
+#         retry_count: 1
 workflows:
   - intent_type: analytical
     description: "Process queries requesting specific calculations, amounts, or data analysis"
