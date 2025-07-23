@@ -90,22 +90,17 @@ const GetStarted = () => {
           <span className="text-2xl font-semibold text-gray-700 text-center">
             Receipts History
           </span>
-           <span className="text-lg text-gray-500 text-center">
-            track expenses
-          </span>
         </button>
 
         {/* Card 4: Dashboard */}
         <button
+        onClick={() => navigate('/dashboard')}
           className="bg-white rounded-3xl shadow-md hover:shadow-xl transition-shadow duration-300 p-8 w-72 h-72 flex flex-col justify-center items-center space-y-6"
           aria-label="Dashboard"
         >
           <DashboardIcon />
           <span className="text-2xl font-semibold text-gray-700 text-center">
             Dashboard
-          </span>
-          <span className="text-lg text-gray-500 text-center">
-            gain insights
           </span>
         </button>
 
