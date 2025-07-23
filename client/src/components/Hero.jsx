@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import HeroIllustration from './HeroIllustration';
 import { useNavigate } from 'react-router-dom';
 
