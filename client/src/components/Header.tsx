@@ -61,8 +61,8 @@ const Header: React.FC = () => {
       <nav className="flex justify-between items-center">
         <div className="text-2xl font-extrabold tracking-tight">
           <div className="flex items-center space-x-2">
-            <img src={logo} alt="Raseed Logo" className="w-8 h-8 object-contain" />
-            <span className="text-2xl font-bold text-gray-800">RASEED</span>
+            <img src={logo} alt="Raseed Logo" className="w-20 h-16 object-contain" />
+            {/* <span className="text-2xl font-bold text-gray-800">RASEED</span> */}
           </div>
         </div>
 
