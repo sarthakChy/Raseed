@@ -56,11 +56,11 @@ const GetStarted = () => {
         Get Started
       </h1>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
         {/* Card 1: Scan a receipt */}
         <button
-        onClick={() => navigate('/scanrecipts')}
-          className="bg-white rounded-3xl shadow-md hover:shadow-xl transition-shadow duration-300 p-8 w-72 h-72 flex flex-col justify-center items-center space-y-6"
+        onClick={() => navigate('/scanreceipts')}
+          className="bg-white rounded-3xl shadow-md hover:shadow-xl transition-shadow duration-300 p-8 w-64 h-64 flex flex-col justify-center items-center space-y-6"
           aria-label="Scan a receipt"
         >
           <ScanIcon />
@@ -72,7 +72,7 @@ const GetStarted = () => {
         {/* Card 2: Ask questions */}
         <button
           onClick={() => navigate('/chatbot')}
-          className="bg-white rounded-3xl shadow-md hover:shadow-xl transition-shadow duration-300 p-8 w-72 h-72 flex flex-col justify-center items-center space-y-6"
+          className="bg-white rounded-3xl shadow-md hover:shadow-xl transition-shadow duration-300 p-8 w-64 h-64 flex flex-col justify-center items-center space-y-6"
           aria-label="Ask questions"
         >
           <AskIcon />
@@ -84,7 +84,7 @@ const GetStarted = () => {
         {/* Card 3: Receipts History */}
         <button
           onClick={() => navigate('/history')}
-          className="bg-white rounded-3xl shadow-md hover:shadow-xl transition-shadow duration-300 p-8 w-72 h-72 flex flex-col justify-center items-center space-y-6"
+          className="bg-white rounded-3xl shadow-md hover:shadow-xl transition-shadow duration-300 p-8 w-64 h-64 flex flex-col justify-center items-center space-y-6"
           aria-label="Receipts History"
         >
           <HistoryIcon />

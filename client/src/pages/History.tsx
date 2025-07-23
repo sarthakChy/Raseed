@@ -126,7 +126,7 @@ const ReceiptRow = ({ receipt }: { receipt: Receipt }) => (
 // --- Main History Component ---
 const History = () => {
   return (
-    <div className="bg-gray-50 min-h-screen p-4 sm:p-8">
+    <div className="bg-gray-50 h-full p-4 sm:p-8">
       <div className="max-w-7xl mx-auto bg-white p-8 rounded-2xl border border-gray-200">
         
         {/* Header Section */}

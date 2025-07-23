@@ -49,6 +49,7 @@ from utils.utils import get_credentials,parse_json,initialize_firestore, initial
 from agents.receipts_agent import ReceiptAgent
 from wallet.receipt_manager import ReceiptWalletManager
 from wallet.shopping_list_manager import ShoppingListWalletManager
+from agents.agent_orchestrator import MasterOrchestrator
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -183,7 +184,7 @@ async def create_wallet_pass(
     that users can add to their Google Wallet app.
     """
     try:
-        
+        print(body)
         uuid = body.get('uuid')
         query_result = db.collection("receiptQueue").where("receiptId", "==", uuid).get()
 
