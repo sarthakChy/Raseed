@@ -1,4 +1,6 @@
 import React from 'react';
+import { useAuth } from "../context/AuthContext";
+import { useNavigate } from 'react-router-dom';
 
 const NavLink = ({ href, children }) => (
   <a href={href} className="text-gray-700 hover:text-black transition-colors duration-300 text-base font-medium">
@@ -8,6 +10,8 @@ const NavLink = ({ href, children }) => (
 
 const Header = () => {
   const logo = 'raseed-logo.png';
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
   return (
     <header className="py-6">
       <nav className="flex justify-between items-center">
@@ -25,6 +29,17 @@ const Header = () => {
           <NavLink href="/Upgrade">Upgrade Plan</NavLink>
           <NavLink href="/faq">FAQs</NavLink>
           <NavLink href="/Contact">Contact</NavLink>
+          {user && (
+            <button
+              onClick={() => {
+                logout();
+                navigate('/');
+              }}
+              className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition"
+            >
+              Logout
+            </button>
+          )}
         </div>
 
         <div className="md:hidden">
