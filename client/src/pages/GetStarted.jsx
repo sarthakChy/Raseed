@@ -59,7 +59,7 @@ const GetStarted = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         {/* Card 1: Scan a receipt */}
         <button
-          onClick={() => navigate('/capture')}
+        onClick={() => navigate('/scanrecipts')}
           className="bg-white rounded-3xl shadow-md hover:shadow-xl transition-shadow duration-300 p-8 w-72 h-72 flex flex-col justify-center items-center space-y-6"
           aria-label="Scan a receipt"
         >
@@ -71,7 +71,7 @@ const GetStarted = () => {
 
         {/* Card 2: Ask questions */}
         <button
-          onClick={openChatbot}
+          onClick={() => navigate('/chatbot')}
           className="bg-white rounded-3xl shadow-md hover:shadow-xl transition-shadow duration-300 p-8 w-72 h-72 flex flex-col justify-center items-center space-y-6"
           aria-label="Ask questions"
         >
@@ -83,6 +83,7 @@ const GetStarted = () => {
 
         {/* Card 3: Receipts History */}
         <button
+          onClick={() => navigate('/history')}
           className="bg-white rounded-3xl shadow-md hover:shadow-xl transition-shadow duration-300 p-8 w-72 h-72 flex flex-col justify-center items-center space-y-6"
           aria-label="Receipts History"
         >
@@ -108,7 +109,9 @@ const GetStarted = () => {
        
         <div className="bg-white shadow-sm rounded-full flex items-center justify-between p-4 mb-8 mt-7 max-w-xl w-full">
         <p className="text-gray-800 pl-4">Unlock more with Premium Subscription.</p>
-        <button className="bg-yellow-400 text-black font-bold py-2 px-6 rounded-full hover:bg-yellow-500 transition-colors duration-300">
+        <button 
+        onClick={() => navigate('/upgrade')}
+        className="bg-yellow-400 text-black font-bold py-2 px-6 rounded-full hover:bg-yellow-500 transition-colors duration-300">
           Upgrade Now
         </button>
       </div>
