@@ -62,6 +62,7 @@ logs/
 
 # Jupyter Notebooks
 .ipynb_checkpoints/
+client/
 
 #APIKeys
 firebase-sdk.json
