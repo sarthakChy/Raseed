@@ -21,10 +21,11 @@ json{
         "totalAmount": "number or null",
         "subtotal": "number or null",
         "tax": "number or null",
-        "items": "array of objects with name and price, or null",
+        "items": "array of objects with name,price, and quantity or null",
         "paymentMethod": "string or null",
         "currency: "string",
         "address": "string or null"
+        "category": "string or null"
     }
 }
 Data Extraction Guidelines
@@ -49,7 +50,9 @@ Items Array
 
 Each item object must have: {"name": "string", "price": number}
 Clean item names: remove excess whitespace, standardize formatting
-Prices should be numerical values without currency symbols
+Prices should be numerical values without currency symbols. 
+Prices should be the total prices for example if apples are 50 INR and quantity are 2 then price should be 100
+Always check the total price for items in the receipt
 If no items are clearly identifiable, set items to null
 
 Additional Details
@@ -58,6 +61,8 @@ date: Convert any date format to YYYY-MM-DD (e.g., "12/25/2023" becomes "2023-12
 paymentMethod: Card type, cash, mobile payment method, etc.
 address: Store location/address if present on receipt
 currency : currency like rupees or USD
+category : determine the category of the purchase based on the items ['groceries','shopping','food','electronics','home_appliances']
+
 Quality Standards
 
 Prioritize accuracy over completeness

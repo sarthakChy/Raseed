@@ -341,6 +341,7 @@ class ShoppingListWalletManager:
             completed_items = len([item for item in items if item.get('completed', False)])
             pending_items = total_items - completed_items
             
+            
             # Update text modules
             text_modules = patch_body.get("textModulesData", [])
             
@@ -410,7 +411,7 @@ class ShoppingListWalletManager:
             if pending_items == 0 and update_data.get('markCompleted', False):
                 patch_body['state'] = 'COMPLETED'
             
-            response = self.client.genericobject().patch(
+            response = self.client.genericobject().update(
                 resourceId=object_id,
                 body=patch_body
             ).execute()

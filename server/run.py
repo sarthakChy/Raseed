@@ -49,6 +49,8 @@ from utils.utils import get_credentials,parse_json,initialize_firestore, initial
 from agents.insights_agent import PurchaseInsightsAgent
 from agents.receipt.receipts_agent import ReceiptAgent
 from wallet.receipt_manager import ReceiptWalletManager
+from wallet.shopping_list_manager import ShoppingListWalletManager
+from wallet.insights_manager import SmartInsightsWalletManager
 from models.pydantic_models import  WalletPassResponse, UpdatePassData
 
 # Configure logging
@@ -350,4 +352,74 @@ async def expire_wallet_pass(
     
     except Exception as e:
         logger.error(f"Unexpected error expiring wallet pass: {e}")
+
+
+# ============================= ShoppingList ===============================================
+
+shopping_list_manager = ShoppingListWalletManager()
+
+@app.post("/shopping-list/create-shopping-pass")
+async def create_wallet_pass(
+    request: Request,
+    auth=Depends(firebase_auth_required),
+    #body: dict = Body(...),
+):
+    """
+    Create a Google Wallet pass for a Shopping List.
+    
+    This endpoint takes shopping data and creates a digital wallet pass
+    that users can add to their Google Wallet app.
+    """
+    try:
+
+        shopping_data = {
+            'listName': 'Weekly Groceries',
+            'items': [
+                {'name': 'Milk', 'quantity': 2, 'estimatedPrice': 5.99, 'completed': False},
+                {'name': 'Bread', 'quantity': 1, 'estimatedPrice': 2.50, 'completed': True},
+                {'name': 'Eggs', 'quantity': 1, 'estimatedPrice': 3.99, 'completed': False}
+            ],
+            'estimatedTotal': 12.48,
+            'category': 'Groceries',
+            'storePreference': 'Walmart',
+            'priority': 'High'
+        }
+
+        result = await shopping_list_manager.create_shopping_list_pass(shopping_data,str(uuid.uuid4()))
+        logger.info(result)
+        if result['success']:
+            return result
+        else:
+            logger.error(f"Failed to create wallet pass: {result.get('error', 'Unknown error')}")
+    except Exception as e:
+        logger.error(f"Internal error creating wallet pass: {e}")
+
+
+@app.put("/shopping-list/update-shopping-pass")
+async def update_wallet_pass(
+    request: Request,
+    auth=Depends(firebase_auth_required),
+    body: dict = Body(...)
+):
+    """
+    Update a Google Wallet pass. Pass `object_id` in the body along with updates.
+    """
+    try:
+        object_id = body.get("object_id")
+        if not object_id:
+            return JSONResponse(status_code=400, content={"error": "Missing object_id in body"})
+
+        update_data = {k: v for k, v in body.items() if k != "object_id"}
+        result = await shopping_list_manager.update_shopping_list_pass(object_id, update_data)
+
+        if result['success']:
+            return result
+        else:
+            logger.error(f"Failed to update wallet pass: {result.get('error', 'Unknown error')}")
+            return JSONResponse(status_code=500, content={"error": result.get("error", "Unknown error")})
+    except Exception as e:
+        logger.error(f"Internal error updating wallet pass: {e}")
+        return JSONResponse(status_code=500, content={"error": "Internal server error"})
+
+
 
