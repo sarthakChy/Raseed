@@ -48,7 +48,7 @@ from utils.utils import get_credentials,parse_json,initialize_firestore, initial
 
 from agents.insights_agent import PurchaseInsightsAgent
 from agents.receipt.receipts_agent import ReceiptAgent
-from agents.wallet_agent import ReceiptWalletManager
+from wallet.receipt_manager import ReceiptWalletManager
 from models.pydantic_models import  WalletPassResponse, UpdatePassData
 
 # Configure logging
@@ -232,19 +232,24 @@ async def create_wallet_pass(
     """
     try:
         
-        # Create wallet pass
-        logger.info(f"Received UUID: {body.get('uuid')}")
-
         uuid = body.get('uuid')
+        query_result = db.collection("receiptQueue").where("receiptId", "==", uuid).get()
 
-        doc_ref = db.collection("receipts").where("uuid", "==", uuid).get()
+        if not query_result:
+            logger.error(f"No receipt found for UUID: {uuid}")
+            return {"success": False, "message": "Receipt not found"}
 
-        receipt_data = doc_ref[0].to_dict()
+        doc = query_result[0]
+        receipt_data = doc.to_dict()
 
         logger.info(f"Retrieved receipt data for UUID {uuid}: {receipt_data}")
 
-        result = await wallet_manager.create_receipt_pass(receipt_data,uuid)
-        
+        # Create wallet pass
+        result = await wallet_manager.create_receipt_pass(receipt_data, uuid)
+
+        # Update the Firestore document with the new pass info
+        doc.reference.update({'walletPass': result})
+
         if result['success']:
             return result
         else:
@@ -252,7 +257,7 @@ async def create_wallet_pass(
     except Exception as e:
         logger.error(f"Internal error creating wallet pass: {e}")
 
-@app.patch("/receipts/update-wallet-pass")
+@app.put("/receipts/update-wallet-pass")
 async def update_wallet_pass(
     request: Request,
     auth=Depends(firebase_auth_required),
@@ -267,11 +272,29 @@ async def update_wallet_pass(
     try:
         
         uuid = body.get('uuid')
+        query_result = db.collection("receiptQueue").where("receiptId", "==", uuid).get()
+
+        if not query_result:
+            logger.error(f"No receipt found for UUID: {uuid}")
+            return {"success": False, "message": "Receipt not found"}
+
+        doc = query_result[0]
+        receipt_data = doc.to_dict()
+
+        logger.info(f"Retrieved receipt data for UUID {uuid}: {receipt_data}")
 
         object_id = f"{GOOGLE_WALLET_ISSUER_ID}.{uuid}"
 
         result = await wallet_manager.update_wallet_pass(object_id, body)
         
+        doc.reference.update({
+            'walletPass': {
+                'pass_data':result['pass_data'],
+                'lastUpdatedAt':datetime.now().isoformat()
+            }
+
+            })
+
         if result['success']:
             return result
         else:
@@ -280,7 +303,7 @@ async def update_wallet_pass(
     except Exception as e:
         logger.error(f"Unexpected error updating wallet pass: {e}")
 
-@app.post("/receipts/expire-wallet-pass")
+@app.patch("/receipts/expire-wallet-pass")
 async def expire_wallet_pass(
     request: Request,
     auth=Depends(firebase_auth_required),
@@ -294,12 +317,31 @@ async def expire_wallet_pass(
     """
     try:            
         
+
         uuid = body.get('uuid')
+        query_result = db.collection("receiptQueue").where("receiptId", "==", uuid).get()
+
+        if not query_result:
+            logger.error(f"No receipt found for UUID: {uuid}")
+            return {"success": False, "message": "Receipt not found"}
+
+        doc = query_result[0]
+        receipt_data = doc.to_dict()
+
+        logger.info(f"Retrieved receipt data for UUID {uuid}: {receipt_data}")
 
         object_id = f"{GOOGLE_WALLET_ISSUER_ID}.{uuid}"
         
         result = await wallet_manager.expire_wallet_pass(object_id)
         
+        doc.reference.update({
+            'walletPass': {
+                'pass_data':result['pass_data'],
+                'lastUpdatedAt':datetime.now().isoformat()
+            }
+
+            })
+
         if result['success']:
             return result
         else:

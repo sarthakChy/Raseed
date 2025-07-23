@@ -57,7 +57,7 @@ Additional Details
 date: Convert any date format to YYYY-MM-DD (e.g., "12/25/2023" becomes "2023-12-25")
 paymentMethod: Card type, cash, mobile payment method, etc.
 address: Store location/address if present on receipt
-currency : current symbol
+currency : currency like rupees or USD
 Quality Standards
 
 Prioritize accuracy over completeness
