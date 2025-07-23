@@ -1,11 +1,13 @@
 import React from 'react';
 import { ArrowLeft, MessageSquare } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
-function AskRaseed({ onBack }) {
+function AskRaseed() {
+    const navigate = useNavigate();
     return (
         <div className="max-w-md mx-auto">
             <header className="flex items-center py-4">
-                <button onClick={onBack} className="p-2 rounded-full hover:bg-slate-200 mr-2">
+                <button onClick={() => navigate('/')} className="p-2 rounded-full hover:bg-slate-200 mr-2">
                     <ArrowLeft className="h-6 w-6 text-slate-600" />
                 </button>
                 <h1 className="text-xl font-bold text-slate-800">Ask RASEED</h1>

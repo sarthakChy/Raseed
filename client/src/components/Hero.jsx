@@ -1,8 +1,9 @@
-
 import React, { useState, useEffect } from 'react';
 import HeroIllustration from './HeroIllustration';
+import { useNavigate } from 'react-router-dom';
 
-const Hero: React.FC = () => {
+const Hero = () => {
+  const navigate = useNavigate();
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
@@ -21,7 +22,10 @@ const Hero: React.FC = () => {
             Raseed organizes your transactions, extracts patterns, and gives follow-ups — all in one place.
           </p>
           <div className="flex flex-col sm:flex-row justify-center md:justify-start space-y-4 sm:space-y-0 sm:space-x-4 pt-4">
-            <button className="bg-[#EF4444] text-white font-semibold py-3 px-8 rounded-lg shadow-lg hover:bg-red-600 transition-all duration-300 transform hover:scale-105">
+            <button
+              className="bg-[#EF4444] text-white font-semibold py-3 px-8 rounded-lg shadow-lg hover:bg-red-600 transition-all duration-300 transform hover:scale-105"
+              onClick={() => navigate('/GetStarted')}
+            >
               Get Started
             </button>
             <button className="bg-white text-gray-900 font-semibold py-3 px-8 rounded-lg border-2 border-gray-900 shadow-sm hover:bg-gray-100 transition-all duration-300 transform hover:scale-105">

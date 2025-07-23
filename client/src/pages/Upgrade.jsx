@@ -2,7 +2,7 @@ import React from 'react';
 
 const Upgrade = () => {
   return (
-    <div className="bg-white min-h-screen font-sans">
+    <div className="bg-white h-full font-sans">
       <main className="p-10">
         <h1 className="text-4xl font-bold text-gray-800 mb-8">Upgrade Plan</h1>
         <div className="max-w-4xl mx-auto">
@@ -28,17 +28,23 @@ const Upgrade = () => {
                   <span className="text-gray-700 font-medium">Unlimited</span>
                 </li>
                 <li className="flex justify-between items-center">
-                   <span></span>
+                  <span></span>
                   <span className="text-gray-700 font-medium">1</span>
                 </li>
                 <li className="flex justify-end items-center">
-                  <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
+                  <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                  </svg>
                 </li>
                 <li className="flex justify-end items-center">
-                  <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
+                  <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                  </svg>
                 </li>
                 <li className="flex justify-end items-center">
-                  <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
+                  <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                  </svg>
                 </li>
                 <li className="flex justify-end items-center pt-4">
                   <button className="bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold w-full hover:bg-blue-700">

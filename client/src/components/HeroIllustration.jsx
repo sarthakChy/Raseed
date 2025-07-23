@@ -1,11 +1,6 @@
-
 import React from 'react';
 
-interface HeroIllustrationProps {
-  isVisible: boolean;
-}
-
-const HeroIllustration: React.FC<HeroIllustrationProps> = ({ isVisible }) => {
+const HeroIllustration = ({ isVisible }) => {
   const baseTransition = 'transition-all duration-1000 ease-out';
 
   return (
@@ -19,10 +14,10 @@ const HeroIllustration: React.FC<HeroIllustrationProps> = ({ isVisible }) => {
           style={{ transitionDelay: '200ms' }}
         >
           <div className="relative w-full h-full">
-             <div className="absolute bottom-0 w-full h-[130px] bg-blue-600 rounded-t-2xl rounded-b-lg border-2 border-black"></div>
-             <div className="absolute bottom-0 w-[95%] left-[2.5%] h-[140px] bg-blue-500 rounded-t-xl"></div>
-             <div className="absolute -top-[18px] w-full h-10 bg-blue-600 rounded-t-xl border-2 border-b-0 border-black"></div>
-             <div className="absolute bottom-4 right-4 w-7 h-7 bg-yellow-400 rounded-full border-2 border-black"></div>
+            <div className="absolute bottom-0 w-full h-[130px] bg-blue-600 rounded-t-2xl rounded-b-lg border-2 border-black"></div>
+            <div className="absolute bottom-0 w-[95%] left-[2.5%] h-[140px] bg-blue-500 rounded-t-xl"></div>
+            <div className="absolute -top-[18px] w-full h-10 bg-blue-600 rounded-t-xl border-2 border-b-0 border-black"></div>
+            <div className="absolute bottom-4 right-4 w-7 h-7 bg-yellow-400 rounded-full border-2 border-black"></div>
           </div>
         </div>
 
@@ -44,7 +39,7 @@ const HeroIllustration: React.FC<HeroIllustrationProps> = ({ isVisible }) => {
             <path d="M0 10 Q 5 0, 10 10 T 20 10 T 30 10 T 40 10 T 50 10 T 60 10 T 70 10 T 80 10 T 90 10 T 100 10" stroke="black" strokeWidth="2" fill="none" />
           </svg>
         </div>
-        
+
         {/* Coin */}
         <div
           className={`absolute bottom-[150px] left-[10px] w-20 h-20 bg-yellow-400 rounded-full flex items-center justify-center border-2 border-black shadow-xl transform animate-[float_3s_ease-in-out_infinite] ${baseTransition} ${
@@ -66,11 +61,25 @@ const HeroIllustration: React.FC<HeroIllustrationProps> = ({ isVisible }) => {
             <div className="w-full h-full bg-green-500 rounded-2xl flex items-center justify-center border-2 border-black shadow-xl">
               <span className="text-white text-5xl font-extrabold">?</span>
             </div>
-            <div className="absolute -bottom-[15px] left-8 w-0 h-0" style={{ borderLeft: '15px solid transparent', borderRight: '15px solid transparent', borderTop: '20px solid black' }}></div>
-            <div className="absolute -bottom-[12.5px] left-8 w-0 h-0" style={{ borderLeft: '15px solid transparent', borderRight: '15px solid transparent', borderTop: '20px solid #22c55e' }}></div>
+            <div
+              className="absolute -bottom-[15px] left-8 w-0 h-0"
+              style={{
+                borderLeft: '15px solid transparent',
+                borderRight: '15px solid transparent',
+                borderTop: '20px solid black',
+              }}
+            ></div>
+            <div
+              className="absolute -bottom-[12.5px] left-8 w-0 h-0"
+              style={{
+                borderLeft: '15px solid transparent',
+                borderRight: '15px solid transparent',
+                borderTop: '20px solid #22c55e',
+              }}
+            ></div>
           </div>
         </div>
-        
+
         {/* Small Bar Chart */}
         <div
           className={`absolute top-[40px] right-0 w-[120px] h-[70px] flex items-end justify-center space-x-2 p-1 transform animate-[float_3s_ease-in-out_infinite] ${baseTransition} ${
@@ -95,9 +104,9 @@ const HeroIllustration: React.FC<HeroIllustrationProps> = ({ isVisible }) => {
             <path d="M 85 2 L 90 5 L 85 8" stroke="black" strokeWidth="2" fill="none" />
           </svg>
           <div className="absolute bottom-2 left-0 right-0 flex items-end justify-evenly h-10 px-4">
-              <div className="w-5 h-4 bg-red-400 border-2 border-black rounded-sm"></div>
-              <div className="w-5 h-8 bg-blue-400 border-2 border-black rounded-sm"></div>
-              <div className="w-5 h-6 bg-yellow-400 border-2 border-black rounded-sm"></div>
+            <div className="w-5 h-4 bg-red-400 border-2 border-black rounded-sm"></div>
+            <div className="w-5 h-8 bg-blue-400 border-2 border-black rounded-sm"></div>
+            <div className="w-5 h-6 bg-yellow-400 border-2 border-black rounded-sm"></div>
           </div>
         </div>
       </div>

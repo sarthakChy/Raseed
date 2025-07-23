@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Upload, Loader2 } from 'lucide-react';
 import AnalysisResultCard from '../components/AnalysisResultCard'; // Import the new card
+import { useNavigate } from 'react-router-dom';
 
-function CaptureReceiptPage({ user, onBack }) {
+function CaptureReceiptPage() {
     const [selectedFile, setSelectedFile] = useState(null);
     const [previewUrl, setPreviewUrl] = useState(null);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [analysisResult, setAnalysisResult] = useState(null);
     const [error, setError] = useState(null);
+    const navigate = useNavigate();
 
     useEffect(() => {
         if (selectedFile && !analysisResult) {
@@ -86,7 +88,7 @@ function CaptureReceiptPage({ user, onBack }) {
     return (
         <div className="max-w-md mx-auto">
             <header className="flex items-center py-4">
-                <button onClick={onBack} className="p-2 rounded-full hover:bg-slate-200 mr-2">
+                <button onClick={() => navigate('/getstarted')} className="p-2 rounded-full hover:bg-slate-200 mr-2">
                     <ArrowLeft className="h-6 w-6 text-slate-600" />
                 </button>
                 <h1 className="text-xl font-bold text-slate-800">Capture Receipt</h1>

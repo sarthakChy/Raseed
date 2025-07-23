@@ -24,49 +24,42 @@ const faqData = [
   },
 ];
 
-const FAQItem: React.FC<{
-  question: string;
-  answer: string;
-  color: string;
-  isOpen: boolean;
-  onToggle: () => void;
-}> = ({ question, answer, color, isOpen, onToggle }) => (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm w-full transition-shadow hover:shadow-md">
-        <button
-            onClick={onToggle}
-            className="w-full flex justify-between items-start text-left p-6"
-            aria-expanded={isOpen}
-        >
-            <div className="flex items-start space-x-4">
-                <div className={`w-4 h-4 rounded-full mt-1 flex-shrink-0 ${color}`}></div>
-                <h3 className="font-bold text-gray-800 text-lg">{question}</h3>
-            </div>
-            <BsChevronDown
-                className={`w-5 h-5 text-gray-500 transform transition-transform duration-300 flex-shrink-0 ${
-                    isOpen ? 'rotate-180' : 'rotate-0'
-                }`}
-            />
-        </button>
-        <div
-            className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                isOpen ? 'max-h-60' : 'max-h-0'
-            }`}
-        >
-            <p className="text-gray-600 px-6 pb-6 pl-14">{answer}</p>
-        </div>
+const FAQItem = ({ question, answer, color, isOpen, onToggle }) => (
+  <div className="bg-white rounded-xl border border-gray-200 shadow-sm w-full transition-shadow hover:shadow-md">
+    <button
+      onClick={onToggle}
+      className="w-full flex justify-between items-start text-left p-6"
+      aria-expanded={isOpen}
+    >
+      <div className="flex items-start space-x-4">
+        <div className={`w-4 h-4 rounded-full mt-1 flex-shrink-0 ${color}`}></div>
+        <h3 className="font-bold text-gray-800 text-lg">{question}</h3>
+      </div>
+      <BsChevronDown
+        className={`w-5 h-5 text-gray-500 transform transition-transform duration-300 flex-shrink-0 ${
+          isOpen ? 'rotate-180' : 'rotate-0'
+        }`}
+      />
+    </button>
+    <div
+      className={`overflow-hidden transition-all duration-300 ease-in-out ${
+        isOpen ? 'max-h-60' : 'max-h-0'
+      }`}
+    >
+      <p className="text-gray-600 px-6 pb-6 pl-14">{answer}</p>
     </div>
+  </div>
 );
 
+const FAQs = () => {
+  const [openIndex, setOpenIndex] = useState(0);
 
-const FAQs: React.FC = () => {
-  const [openIndex, setOpenIndex] = useState<number | null>(0);
-
-  const handleToggle = (index: number) => {
+  const handleToggle = (index) => {
     setOpenIndex(openIndex === index ? null : index);
   };
 
   return (
-    <section className="py-16 sm:py-24">
+    <section className="pt-8">
       <div className="max-w-3xl mx-auto text-center">
         <h2 className="text-3xl md:text-4xl font-extrabold text-gray-900 mb-12">
           Frequently Asked Questions
