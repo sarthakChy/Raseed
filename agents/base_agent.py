@@ -8,7 +8,8 @@ import json
 from google.cloud import aiplatform
 from vertexai.generative_models import GenerativeModel, Tool, FunctionDeclaration
 import vertexai
-
+from core.base_agent_tools.config_manager import AgentConfig
+from core.base_agent_tools.vertex_initializer import VertexAIInitializer
 from core.base_agent_tools.user_profile_manager import UserProfileManager
 from core.base_agent_tools.error_handler import ErrorHandler
 from core.base_agent_tools.integration_coordinator import IntegrationCoordinator
@@ -16,47 +17,35 @@ from core.base_agent_tools.database_connector import DatabaseConnector
 
 
 class BaseAgent(ABC):
-    """
-    Base class for all financial analysis agents.
-    Provides common functionality including Vertex AI setup, tool management,
-    and shared operations.
-    """
-    
     def __init__(
         self,
         agent_name: str,
-        project_id: str,
-        location: str = "us-central1",
-        model_name: str = "gemini-1.5-pro",
+        project_id: Optional[str] = None,
+        location: Optional[str] = None,
+        model_name: Optional[str] = None,  # Keep for backwards compatibility but will use config default
         user_id: Optional[str] = None
     ):
-        """
-        Initialize the base agent with common setup.
+        # Load configuration
+        self.config = AgentConfig.from_env()
         
-        Args:
-            agent_name: Unique identifier for this agent
-            project_id: Google Cloud project ID
-            location: Vertex AI location
-            model_name: Generative model to use
-            user_id: Current user identifier
-        """
+        # Use provided values or fall back to config defaults
         self.agent_name = agent_name
-        self.project_id = project_id
-        self.location = location
-        self.model_name = model_name
+        self.project_id = project_id or self.config.project_id
+        self.location = location or self.config.location
+        self.model_name = model_name or self.config.model_name  # Will always be gemini-2.0-flash-001
         self.user_id = user_id
         
         # Initialize logging
         self.logger = self._setup_logging()
         
-        # Initialize Vertex AI
-        self._initialize_vertex_ai()
+        # Initialize Vertex AI using shared initializer
+        VertexAIInitializer.initialize(self.project_id, self.location)
         
         # Initialize shared tools
         self.user_profile_manager = UserProfileManager()
         self.error_handler = ErrorHandler(self.logger)
         self.integration_coordinator = IntegrationCoordinator()
-        self.db_connector = DatabaseConnector(project_id)
+        self.db_connector = DatabaseConnector(self.project_id)
         
         # Registry for all tools
         self.tools_registry: Dict[str, Any] = {}
@@ -85,19 +74,6 @@ class BaseAgent(ABC):
             logger.addHandler(handler)
         
         return logger
-    
-    def _initialize_vertex_ai(self):
-        """Initialize Vertex AI client."""
-        try:
-            vertexai.init(project=self.project_id, location=self.location)
-            self.logger.info("Vertex AI initialized successfully")
-        except Exception as e:
-            self.error_handler.handle_error(
-                error=e,
-                context=f"Failed to initialize Vertex AI for {self.agent_name}",
-                user_id=self.user_id
-            )
-            raise
     
     def _register_base_tools(self):
         """Register tools that are common to all agents."""
@@ -178,7 +154,6 @@ class BaseAgent(ABC):
         # Register tool execution functions
         self.tools_registry.update({
             "get_user_profile": self._execute_get_user_profile,
-            "execute_database_query": self._execute_database_query,
             "log_error": self._execute_log_error,
         })
     
@@ -212,12 +187,13 @@ class BaseAgent(ABC):
             executor_func: Function to execute when tool is called
         """
         self.vertex_tools.append(tool_declaration)
-        self.tools_registry[tool_declaration.name] = executor_func
+        self.tools_registry[tool_declaration._raw_function_declaration.name] = executor_func
+
         
         # Reinitialize model with updated tools
         self._initialize_model()
         
-        self.logger.info(f"Registered tool: {tool_declaration.name}")
+        self.logger.info(f"Registered tool: {tool_declaration._raw_function_declaration.name}")
     
     async def execute_tool_call(self, function_call) -> Dict[str, Any]:
         """
@@ -259,10 +235,6 @@ class BaseAgent(ABC):
         """Execute user profile retrieval."""
         return await self.user_profile_manager.get_profile(user_id, profile_sections)
     
-    async def _execute_database_query(self, query: str, parameters: Optional[Dict] = None, cache_key: Optional[str] = None) -> Dict[str, Any]:
-        """Execute database query."""
-        return await self.db_connector.execute_query(query, parameters, cache_key)
-    
     async def _execute_log_error(self, error_type: str, message: str, context: Optional[Dict] = None) -> Dict[str, Any]:
         """Execute error logging."""
         self.error_handler.log_error(error_type, message, context or {})
@@ -282,35 +254,35 @@ class BaseAgent(ABC):
         """
         pass
     
-    async def generate_response(self, prompt: str, context: Optional[Dict] = None) -> str:
+    async def generate_response(self, prompt: Union[str, List[Any]]) -> str:
         """
-        Generate a response using the model.
-        
-        Args:
-            prompt: Input prompt for the model
-            context: Additional context for the conversation
-            
-        Returns:
-            Generated response text
+        Generates a response from the model based on the given prompt.
+        Handles both text responses and tool function calls.
         """
         try:
-            # Add user context if available
-            if context and self.user_id:
-                user_profile = await self.user_profile_manager.get_profile(self.user_id)
-                context.update({"user_profile": user_profile})
-            
             # Generate response
-            response = await self.model.generate_content_async(prompt)
+            response = await self.model.generate_content_async(
+                prompt,
+                tools=self.vertex_tools,
+                tool_config={"function_calling_config": {"mode": "AUTO"}}
+            )
+
+            # Initialize response parts
+            response_text = ""
             
-            # Handle function calls if present
-            if response.candidates[0].content.parts:
+            if response.candidates and response.candidates[0].content.parts:
                 for part in response.candidates[0].content.parts:
                     if hasattr(part, 'function_call') and part.function_call:
                         tool_result = await self.execute_tool_call(part.function_call)
-                        # Continue conversation with tool results if needed
-                        
-            return response.text if response.text else "No response generated"
-            
+                        self.logger.info(f"Executed tool: {part.function_call.name} with result: {tool_result}")
+                        # Incorporate tool result into the response text, or decide on a different strategy
+                        response_text += f" (Action performed: {part.function_call.name} with result: {tool_result.get('result', 'No specific result')})"
+                    elif hasattr(part, 'text') and part.text:
+                        response_text += part.text
+
+            final_response = response_text.strip()
+            return final_response if final_response else "No response generated or only tool calls were made."
+
         except Exception as e:
             self.error_handler.handle_error(
                 error=e,

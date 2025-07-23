@@ -30,7 +30,7 @@ import re
 import traceback
 import base64
 from dotenv import load_dotenv
-
+from utils.utils import get_credentials
 from fastapi import (
     FastAPI, HTTPException, Query, Body, Request,
     File, UploadFile, Form, Depends, Header
@@ -38,7 +38,7 @@ from fastapi import (
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.background import BackgroundTasks
-
+from agents.agent_orchestrator import MasterOrchestrator
 from dotenv import load_dotenv
 import requests as req
 
@@ -52,18 +52,11 @@ import firebase_admin
 from firebase_admin import credentials, auth
 
 from agents.prompts import SYSTEM_INSTRUCTION, FEW_SHOT_EXAMPLES
-from agents.insights_agent import PurchaseInsightsAgent
+# from agents.insight_synthesis_agent import PurchaseInsightsAgent
 
 
 # ========================== Environment Setup ==========================
 load_dotenv()
-
-try:
-    PROJECT_ID = os.getenv("PROJECT_ID")
-    LOCATION = os.getenv("GCP_LOCATION")
-    vertexai.init(project=PROJECT_ID, location=LOCATION)
-except KeyError:
-    raise RuntimeError("GCP_PROJECT_ID not found in .env file.")
 
 if not firebase_admin._apps:
     FIREBASE_CRED_PATH = os.environ.get("FIREBASE_CRED_PATH", "firebase-sdk.json")
@@ -73,12 +66,14 @@ if not firebase_admin._apps:
     except Exception as e:
         raise RuntimeError(f"Could not initialize Firebase Admin SDK: {str(e)}")
 
-#Initialize cloud storage and firestore clients
+PROJECT_ID,LOCATION,BUCKET_NAME,GOOGLE_WALLET_ISSUER_ID = get_credentials()
 
 try:
-    BUCKET_NAME = os.getenv("GCS_BUCKET_NAME")
-except KeyError:
-    raise RuntimeError("GCS_BUCKET_NAME not found in .env file. Please set it.")
+    vertexai.init(project=PROJECT_ID, location=LOCATION) #global init for Vertex AI SDK
+    logging.info(f"Vertex AI SDK initialized for project '{PROJECT_ID}' in '{LOCATION}'.")
+except Exception as e:
+    logging.error(f"Critical: Failed to initialize Vertex AI SDK: {e}")
+    sys.exit(1) 
 
 storage_client = initialize_gcs_client()
 db = initialize_firestore()
@@ -187,20 +182,42 @@ async def analyze_receipt(
 @app.post("/chat")
 async def chat_handler(
     request: Request,
-    auth=Depends(firebase_auth_required),
+    # auth=Depends(firebase_auth_required),
     body: dict = Body(...)
 ):
     try:
-        user_message = body.get("message")
-        if not user_message:
-            raise HTTPException(status_code=400, detail="Missing 'message' in body.")
+        orchestrator = MasterOrchestrator(
+            project_id=os.getenv("PROJECT_ID"),  # dummy project id
+            config_path="config/agent_config.yaml",
+            location="us-central1",
+            model_name="gemini-2.0-flash-001"
+        )
 
-        model = GenerativeModel("gemini-2.0-flash-001")
-        chat = model.start_chat()
+        user_query = "Help me save money on shopping"
 
-        response = chat.send_message(user_message)
+        # Provide dummy user_id and optional context
+        result = await orchestrator.process_query(
+            query=user_query,
+            user_id="a73ff731-9018-45ed-86ff-214e91baf702",
+            additional_context={
+                "currency": "USD",
+                "timezone": "America/New_York",
+                "preferred_categories": ["groceries", "food", "transport"]
+            }
+        )
 
-        return JSONResponse(content={"reply": response.text})
+        print("----- Final Orchestrator Response -----")
+        print(result)
+        # user_message = body.get("message")
+        # if not user_message:
+        #     raise HTTPException(status_code=400, detail="Missing 'message' in body.")
+
+        # model = GenerativeModel("gemini-2.0-flash-001")
+        # chat = model.start_chat()
+
+        # response = chat.send_message(user_message)
+
+        return JSONResponse(content={"reply": result.text})
 
     except Exception as e:
         logging.error(f"Chat endpoint error: {e}")
@@ -238,3 +255,58 @@ async def analyze_insights(
 
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
+
+@app.post("/orchestrator/query")
+async def orchestrator_query(
+    request: Request,
+    body: dict = Body(...) 
+):
+    """
+    Process a user query through the Master Orchestrator
+    Uses hardcoded values for testing purposes.
+    
+    Expected body:
+    {
+        "query": "How much did I spend on groceries last month?"
+    }
+    """
+    try:
+        # Extract query from request body
+        user_query = body.get("query")
+        if not user_query:
+            raise HTTPException(status_code=400, detail="Missing 'query' in request body")
+        
+        # HARDCODED VALUES FOR TESTING
+        hardcoded_user_id = "user_alice_123"
+        hardcoded_config_path = "config/agent_config.yaml"
+        hardcoded_additional_context = {
+            "currency": "USD",
+            "timezone": "America/New_York",
+            "preferred_categories": ["groceries", "food", "transport"]
+        }
+        
+        # Initialize the orchestrator with hardcoded values
+        orchestrator = MasterOrchestrator(
+            project_id=PROJECT_ID,
+            config_path=hardcoded_config_path,
+            location=LOCATION,
+            model_name="gemini-2.0-flash-001"
+        )
+        
+        # Process the query with hardcoded values
+        result = await orchestrator.process_query(
+            query=user_query,
+            user_id=hardcoded_user_id,
+            additional_context=hardcoded_additional_context
+        )
+        
+        # Convert Pydantic model to dict before JSONResponse
+        return JSONResponse(content={"result": result.dict()}, status_code=200)
+        
+    except FileNotFoundError as e:
+        logging.error(f"Configuration file not found: {e}")
+        raise HTTPException(status_code=500, detail="Agent configuration not found")
+    except Exception as e:
+        logging.error(f"Orchestrator endpoint error: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
