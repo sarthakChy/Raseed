@@ -528,107 +528,95 @@ class FinancialAnalysisAgent(BaseAgent):
     #     return await self.external_data_tool.integrate_data(data_source, **kwargs)
     
     async def process(self, request: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Main processing entry point for financial analysis queries.
+        Expects a structured_query and user_id in the request.
+        """
         try:
-            start_time = datetime.now()
-            
-            # Extract request components
-            query = request.get("query", "")
-            user_id = request.get("user_id", self.user_id)
-            analysis_type = request.get("analysis_type", "general")
-            context = request.get("context", {})
-            
-            self.logger.info(f"Processing financial analysis request: {query[:100]}...")
-            
-            # Set user context if provided
-            if user_id:
-                self.set_user_context(user_id)
-            else:
-                self.logger.error("No valid user_id provided in request")
-                return {
-                    "success": False,
-                    "error": "No valid user_id provided",
-                    "query": query,
-                    "timestamp": datetime.now().isoformat()
+            self.logger.info("Processing financial analysis request")
+
+            structured_query = request.get("structured_query")
+            user_id = request.get("user_id")
+
+            if structured_query is None or user_id is None:
+                raise ValueError("Missing required input: structured_query and user_id must be provided")
+
+            # Handle structured_query if it's a pydantic model
+            if hasattr(structured_query, "model_dump"):
+                structured_query = structured_query.model_dump()
+
+            # Extract time range
+            time_range = structured_query.get("time_range", {})
+            if hasattr(time_range, "model_dump"):
+                time_range = time_range.model_dump()
+
+            start_date = time_range.get("start_date")
+            end_date = time_range.get("end_date")
+
+            # Extract filters and ensure it's a dictionary
+            filters = structured_query.get("filters", {})
+            if hasattr(filters, "model_dump"):
+                filters = filters.model_dump()
+
+            # Inject date_range into filters
+            if start_date and end_date:
+                filters["date_range"] = {
+                    "start_date": start_date,
+                    "end_date": end_date
                 }
-            
-            # Get user profile for personalized analysis
-            user_profile = {}
-            if user_id:
-                try:
-                    user_profile = await self.user_profile_manager.get_personalization_context(user_id)
-                except Exception as e:
-                    self.logger.warning(f"Could not retrieve user profile: {e}")
-            
-            # Build comprehensive analysis prompt
-            analysis_prompt = self._build_analysis_prompt(query, user_profile, context, analysis_type)
-            
-            # Generate initial response with tool calls
-            response = await self.model.generate_content_async(analysis_prompt)
-            
-            # Process any tool calls
-            tool_results = {}
-            initial_text = ""
-            
-            # Check if response has text content
-            try:
-                initial_text = response.text if response.text else ""
-            except Exception as e:
-                self.logger.warning(f"No text in initial response: {e}")
-                initial_text = ""
-            
-            # Process function calls
-            if response.candidates and response.candidates[0].content.parts:
-                for part in response.candidates[0].content.parts:
-                    if hasattr(part, 'function_call') and part.function_call:
-                        # Ensure user_id is passed to tool execution
-                        function_call = part.function_call
-                        if function_call.name == "execute_financial_query":
-                            function_call.args["user_id"] = user_id
-                        
-                        tool_result = await self.execute_tool_call(function_call)
-                        tool_results[function_call.name] = tool_result
-            
-            # If we have tool results but no initial text, generate a comprehensive analysis
-            if tool_results and not initial_text:
-                final_response = await self._generate_comprehensive_analysis(
-                    query, "", tool_results, user_profile, context
-                )
-            elif tool_results and initial_text:
-                # Generate final analysis incorporating tool results
-                final_response = await self._generate_comprehensive_analysis(
-                    query, initial_text, tool_results, user_profile, context
-                )
-            else:
-                # Use initial text if available, otherwise provide a fallback
-                final_response = initial_text if initial_text else "Unable to process the financial analysis request."
-            
-            execution_time = (datetime.now() - start_time).total_seconds()
-            
-            # Return comprehensive results
+
+            analysis_params = structured_query.get("analysis_parameters", {})
+            if hasattr(analysis_params, "model_dump"):
+                analysis_params = analysis_params.model_dump()
+
+            aggregation = analysis_params.get("aggregation_level", "sum")
+            group_by = analysis_params.get("grouping", [])
+            query_type = structured_query.get("query_type")
+
+            # Map external query types to internal ones
+            query_type_mapping = {
+                "spending_analysis": "transactions",
+                "category_breakdown": "aggregations",
+                "trend_analysis": "trends",
+                "comparison": "comparisons",
+                "budget_check": "budget_analysis",
+                "anomaly_detection": "anomalies",
+                "goal_tracking": "goal_progress",
+                "merchant_analysis": "aggregations",  # or a separate handler if needed
+                "forecast": "trends",  # depending on what you're forecasting
+                "general_inquiry": "transactions"
+            }
+
+            original_query_type = structured_query.get("query_type")
+            query_type_key = original_query_type.lower() if isinstance(original_query_type, str) else original_query_type.value
+
+            query_type = query_type_mapping.get(query_type_key)
+            if not query_type:
+                raise ValueError(f"Unsupported query type: {original_query_type}")
+
+
+            # Run the PostgreSQL query using extracted params
+            result = await self._execute_financial_query(
+                query_type=query_type,
+                user_id=user_id,
+                filters=filters,
+                aggregation=aggregation,
+                group_by=group_by,
+                start_date=start_date,
+                end_date=end_date,
+                analysis_params=analysis_params
+            )
+
             return {
                 "success": True,
-                "analysis": final_response,
-                "response": final_response,  # Add this for consistency with orchestrator expectations
-                "tool_results": tool_results,
-                "execution_time": execution_time,
-                "user_id": user_id,
-                "analysis_type": analysis_type,
-                "timestamp": datetime.now().isoformat()
+                "analysis": result
             }
-            
+
         except Exception as e:
-            self.logger.error(f"Financial analysis processing failed: {e}")
-            self.error_handler.handle_error(
-                error=e,
-                context=f"Failed to process financial analysis request",
-                user_id=user_id
-            )
-            
+            self.logger.error(f"Error during financial analysis: {str(e)}")
             return {
                 "success": False,
-                "error": str(e),
-                "query": query,
-                "timestamp": datetime.now().isoformat()
+                "error": str(e)
             }
     
     def _build_analysis_prompt(
