@@ -1,18 +1,17 @@
 from agents.base_agent import BaseAgent
-from core.insights_agent_tools.insight_summary import InsightSummaryTool
-from core.insights_agent_tools.visualisation import VisualisationTool
-from core.insights_agent_tools.explanation import ExplanationTool
+from core.insight_agent_tools.insight_summary import InsightSummaryTool
+from core.insight_agent_tools.visualisation import VisualisationTool
+from core.insight_agent_tools.explanation import ExplanationTool
 from vertexai.preview.generative_models import FunctionDeclaration
 from typing import Dict, Any
 
 
 class InsightSynthesisAgent(BaseAgent):
-    def __init__(self, agent_name: str = "insight_synthesis_agent", project_id: str = "massive-incline-466204-t5",location: str = "us-central1", user_id: str = None, model=None):
+    def __init__(self, project_id: str, user_id: str = None, model=None):
         super().__init__(
             agent_name="insight_synthesis_agent",
             project_id=project_id,
             user_id=user_id,
-            location = "us-central1",
             model_name=model
         )
 

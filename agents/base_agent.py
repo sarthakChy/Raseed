@@ -183,6 +183,7 @@ class BaseAgent(ABC):
         Registers a new tool (FunctionDeclaration) with the agent.
         """
         tool_name = tool_declaration._raw_function_declaration.name
+<<<<<<< HEAD
 
         # Remove any existing declaration with the same name
         self.vertex_tools = [
@@ -192,12 +193,25 @@ class BaseAgent(ABC):
         # Add the new tool declaration to the flat list
         self.vertex_tools.append(tool_declaration)
         self.tools_registry[tool_declaration._raw_function_declaration.name] = executor_func
+=======
+>>>>>>> 1a81f53 (Insight Agent Setup)
 
-        
-        # Reinitialize model with updated tools
+        # Remove any existing declaration with the same name
+        self.vertex_tools = [
+            fd for fd in self.vertex_tools if fd._raw_function_declaration.name != tool_name
+        ]
+
+        # Add the new tool declaration to the flat list
+        self.vertex_tools.append(tool_declaration)
+
+        # Map its execution function
+        self.tools_registry[tool_name] = executor_func
+
+        # Re-initialize the model to make it aware of the new, complete set of tools
         self._initialize_model()
-        
-        self.logger.info(f"Registered tool: {tool_declaration._raw_function_declaration.name}")
+
+        self.logger.info(f"Registered tool: {tool_name}")
+
     
     async def execute_tool_call(self, function_call) -> Dict[str, Any]:
         """

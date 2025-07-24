@@ -1,0 +1,71 @@
+import React from "react";
+
+const ReceiptDetailsDialog = ({ isOpen, onClose, receipt }) => {
+  if (!isOpen || !receipt) return null;
+
+  const data = receipt.fullData || {};
+
+  const titlecase = (str) => {
+    if (typeof str !== "string") return "N/A";
+    return str
+      .toLowerCase()
+      .replace(/_/g, " ")
+      .split(" ")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+      <div className="bg-white rounded-lg p-6 max-w-2xl w-full shadow-lg overflow-y-auto max-h-[90vh] hide-scrollbar">
+        <h2 className="text-xl font-bold mb-4">Receipt Details</h2>
+
+        <div className="space-y-2 text-sm text-gray-700">
+          <p>
+            <strong>Merchant:</strong> {data.merchantName || "Unknown"}
+          </p>
+          <p>
+            <strong>Total Amount:</strong> ₹{(data.totalAmount || 0).toFixed(2)}
+          </p>
+          <p>
+            <strong>Date:</strong> {receipt.date}
+          </p>
+          <p>
+            <strong>Category:</strong> {receipt.category}
+          </p>
+          <p>
+            <strong>Payment Method:</strong> {titlecase(data.paymentMethod)}
+          </p>
+          <p>
+            <strong>Tax:</strong> ₹{(data.taxAmount || 0).toFixed(2)}
+          </p>
+          <p>
+            <strong>Items:</strong>
+          </p>
+          <ul className="list-disc pl-6">
+            {Array.isArray(data.items) && data.items.length > 0 ? (
+              data.items.map((item, index) => (
+                <li key={index}>
+                  {item.name} — ₹{item.price?.toFixed(2)} × {item.quantity}
+                </li>
+              ))
+            ) : (
+              <li>No item data available</li>
+            )}
+          </ul>
+        </div>
+
+        <div className="mt-6 text-right">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            Okay
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ReceiptDetailsDialog;
