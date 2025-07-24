@@ -26,12 +26,11 @@ def save_receipt_to_cloud(
     parsed_data: Dict[str, Any], 
     image_bytes: bytes, 
     file: UploadFile,
-    uploadedAt,
-    processedAt,
-    uuid: str,
-    user_id: str = 'user_sarthak_2314',
-    email: str = 'choudharysarthak.6@gmail.com',
-    
+    uploadedAt: datetime,
+    processedAt: datetime,
+    receipt_id: str,
+    user_id: str,
+    email: str,
 ) -> Dict[str, Any]:
     """
     Uploads a receipt image to GCS and saves its data to Firestore.
@@ -39,7 +38,7 @@ def save_receipt_to_cloud(
     """
     try:
         # 1. Upload image to GCS
-        unique_filename = f"receipts/{user_id or 'anonymous'}/{uuid}-{file.filename}"
+        unique_filename = f"receipts/{user_id or 'anonymous'}/{receipt_id}-{file.filename}"
         blob = bucket.blob(unique_filename)
         blob.upload_from_string(image_bytes, content_type=file.content_type)
         logging.info(f"Image uploaded to {unique_filename}.")
@@ -53,9 +52,7 @@ def save_receipt_to_cloud(
         current_time = datetime.utcnow().isoformat()
 
         if not user_doc:
-            # Create user data , needs to be done at correct endpoint
             display_name = email.split("@")[0].capitalize()
-
             user_data = {
                 "userId": user_id,
                 "email": email,
@@ -108,21 +105,17 @@ def save_receipt_to_cloud(
                     "riskTolerance": random.choice(["Low", "Moderate", "High"])
                 }
             }
-            # Save user to Firestore
             db.collection("users").document().set(user_data)
             logging.info(f"User created with userId: {user_id}")
-
         else:
-            # Optional: update lastLoginAt or any other user activity, needs to be done at correct endpoint
             db.collection("users").document(user_doc.id).update({
                 "lastLoginAt": current_time
             })
-
             logging.info(f"Existing user {user_id} updated.")
 
         # 3. Save receipt
         receipt_data = {
-            'receiptId': uuid,
+            'receiptId': receipt_id,
             'userId': user_id,
             'uploadedAt': uploadedAt.isoformat(),
             'processedAt': processedAt.isoformat(),

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import { useAuth } from "../context/AuthContext";
+import React from "react";
 
 export default function SignUpCard() {
   const navigate = useNavigate();
@@ -16,7 +17,7 @@ export default function SignUpCard() {
 
   const { mutate, isPending, isError, error } = useMutation({
     mutationFn: signUp,
-    onSuccess: () => navigate("/dashboard"),
+    onSuccess: () => navigate("/getstarted"),
   });
 
   function handleChange(e) {
@@ -36,17 +37,21 @@ export default function SignUpCard() {
   }
 
   return (
-    <div className="flex min-h-full flex-col justify-center px-4 py-8 sm:px-6 lg:px-8 w-full max-w-sm mx-auto bg-white rounded-xl shadow-md">
+    <div className="flex min-h-full flex-col justify-center px-4 py-6 sm:px-6 lg:px-8 w-full max-w-sm mx-auto bg-white rounded-xl shadow-md">
       <div className="text-center">
         <button onClick={() => navigate("/")}>
-          <img alt="Your Company" src="/logo.png" className="h-20 w-auto mx-auto" />
+          <img
+            alt="Your Company"
+            src="/raseed-logo.png"
+            className="h-16 w-auto mx-auto"
+          />
         </button>
-        <h2 className="mt-4 text-2xl font-bold tracking-tight text-gray-900">
+        <h2 className="mt-2 text-xl font-bold tracking-tight text-gray-900">
           Create your Florette account
         </h2>
       </div>
 
-      <div className="mt-8 bg-blue-50 p-6 rounded-xl">
+      <div className="mt-6 bg-[#E8F0FE] p-5 rounded-xl">
         <form onSubmit={handleSubmit} className="space-y-3">
           {["name", "email", "password", "confirmPassword"].map((field) => (
             <div key={field}>
@@ -68,18 +73,18 @@ export default function SignUpCard() {
                 autoComplete={field}
                 value={formData[field]}
                 onChange={handleChange}
-                className="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2 text-base text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-1.5 text-base text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#4285F4]"
               />
             </div>
           ))}
 
-          {isError && <p className="text-sm text-red-600">{error.message}</p>}
+          {isError && <p className="text-sm text-[#DB4437]">{error.message}</p>}
 
           <div>
             <button
               type="submit"
               disabled={isPending}
-              className="w-full flex justify-center items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full flex justify-center items-center gap-2 rounded-md bg-[#4285F4] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-[#4285F4]"
             >
               {isPending && (
                 <svg
@@ -108,11 +113,11 @@ export default function SignUpCard() {
           </div>
         </form>
 
-        <p className="mt-6 text-center text-sm text-gray-500">
+        <p className="mt-4 text-center text-sm text-gray-500">
           Already a member?{" "}
           <button
             onClick={() => navigate("/signin")}
-            className="font-semibold text-blue-600 hover:text-blue-500"
+            className="font-semibold text-[#0F9D58] hover:text-[#0F9D58]/80"
           >
             Sign in
           </button>
