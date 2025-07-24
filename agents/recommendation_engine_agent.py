@@ -1,5 +1,6 @@
 import logging
 import asyncio
+import asyncpg
 import json
 import traceback
 from typing import Dict, Any, List, Optional
@@ -9,7 +10,7 @@ from agents.base_agent import BaseAgent
 from core.recommendation_agent_tools.tools_intructions import behavioral_synthesis_instruction,alternatives_synthesis_instruction,budget_optimization_synthesis_instruction,cost_benefit_synthesis_instruction,goal_alignment_synthesis_instruction
 from vertexai.generative_models import GenerativeModel, FunctionDeclaration, Tool
 from datetime import datetime, timedelta
-
+from google.cloud import secretmanager
 
 class RecommendationEngineAgent(BaseAgent):
     """
@@ -45,17 +46,48 @@ class RecommendationEngineAgent(BaseAgent):
 
         # Store System Instructions for synthesis phase
         # These will be used to initialize *new* GenerativeModel instances for synthesis.
+        self.connection_pool: Optional[asyncpg.Pool] = None
         self.behavioral_synthesis_instruction = behavioral_synthesis_instruction
         self.alternatives_synthesis_instruction = alternatives_synthesis_instruction
         self.budget_optimization_synthesis_instruction = budget_optimization_synthesis_instruction
         self.cost_benefit_synthesis_instruction = cost_benefit_synthesis_instruction
         self.goal_alignment_synthesis_instruction = goal_alignment_synthesis_instruction
-
+        self.secret_client = secretmanager.SecretManagerServiceClient()
+        secret_name = f"projects/{self.project_id}/secrets/postgres-config/versions/latest"
+        response = self.secret_client.access_secret_version(request={"name": secret_name})
+        secret_data = json.loads(response.payload.data.decode("UTF-8"))
+        self.db_config = {
+            'host': secret_data["host"],
+            'port': secret_data.get("port", 5432),
+            'database': secret_data["database"],
+            'user': secret_data["user"],
+            'password': secret_data["password"],
+            'min_size': 5,
+            'max_size': 20,
+            'command_timeout': 60
+        }
         # Register the specialized tools. This call will internally trigger self._initialize_model()
         # from BaseAgent, making the main self.model aware of these new tools.
         self._register_recommendation_tools()
 
         print(f"{self.agent_name} initialized and specialized tools registered.")
+    
+    async def initialize_connection_pool(self):
+        """Initialize the database connection pool."""
+        try:
+            if not self.connection_pool:
+                self.connection_pool = await asyncpg.create_pool(**self.db_config)
+                self.logger.info("PostgreSQL connection pool initialized successfully")
+        except Exception as e:
+            self.logger.error(f"Failed to initialize connection pool: {e}")
+            raise
+    
+    async def close_connection_pool(self):
+        """Close the database connection pool."""
+        if self.connection_pool:
+            await self.connection_pool.close()
+            self.connection_pool = None
+            self.logger.info("PostgreSQL connection pool closed")
 
     def _register_recommendation_tools(self):
         """
@@ -290,8 +322,9 @@ class RecommendationEngineAgent(BaseAgent):
             
             # Set up parameters
             params = [user_id,cutoff_date]
-            
-            behavioral_result = await self.db_connector.execute_query(query, params)
+            async with self.connection_pool.acquire() as conn:
+                rows = await conn.fetch(query, *params)
+            behavioral_result = rows
             behavioral_data = getattr(behavioral_result, 'data', [])
             
             # Check if we have data
@@ -394,7 +427,9 @@ class RecommendationEngineAgent(BaseAgent):
                 params = [item_embedding, item_category, price, user_id]
                 
                 # Execute query
-                alternatives_result = await self.db_connector.execute_query(query, params)
+                async with self.connection_pool.acquire() as conn:
+                    rows = await conn.fetch(query, *params)
+                alternatives_result = rows
                 alternatives_found = getattr(alternatives_result,"data")
 
                 if not alternatives_found:
@@ -463,7 +498,9 @@ class RecommendationEngineAgent(BaseAgent):
                 ORDER BY total_spent DESC;
             """
             params = [user_id]
-            current_allocation_result = await self.db_connector.execute_query(query, params)
+            async with self.connection_pool.acquire() as conn:
+                rows = await conn.fetch(query, *params)
+            current_allocation_result = rows
             current_spending_data = getattr(current_allocation_result,'data')
 
             # Fetch user goals if applicable, using UserProfileManager tool (a BaseAgent tool)
@@ -690,20 +727,20 @@ class RecommendationEngineAgent(BaseAgent):
 
         Args:
             request: A dictionary containing the user's query ('prompt') and any relevant
-                     context for tool parameters, including 'user_id'. This 'prompt'
-                     will be interpreted by the agent's LLM to determine tool usage.
+                    context for tool parameters, including 'user_id'. This 'prompt'
+                    will be interpreted by the agent's LLM to determine tool usage.
 
         Returns:
             Dictionary with processing results, including the synthesized recommendation.
         """
         user_id = request.get("user_id")
         prompt_text = request.get("query")
-        context_data = request.get("spending_analysis", {}) # Additional data the model might need for tool parameters
+        context_data = request.get("spending_analysis", {})  # Additional data the model might need for tool parameters
 
         if user_id:
             context_data['user_id'] = user_id
         if not user_id or not prompt_text:
-            ("Missing 'user_id' or 'prompt' in request to RecommendationEngineAgent.process")
+            print("Missing 'user_id' or 'prompt' in request to RecommendationEngineAgent.process")
             return {"status": "error", "message": "Missing 'user_id' or 'prompt' in request."}
 
         # Set user context for base agent's error handling and user profile manager
@@ -712,14 +749,17 @@ class RecommendationEngineAgent(BaseAgent):
         print(f"RecommendationEngineAgent processing request for user {self.user_id} with prompt: '{prompt_text[:100]}...'")
 
         try:
+            # Fix: Include context data directly in the text prompt instead of as a separate part
+            full_prompt = prompt_text
+            if context_data:
+                # Handle UUID serialization by using default=str
+                full_prompt += f"\n\nAdditional Context: {json.dumps(context_data, indent=2, default=str)}"
 
             input_content = [
                 {"role": "user", 
-                "parts": [{"original_query": prompt_text,}]
+                "parts": [{"text": full_prompt}]
                 }
             ]
-            if context_data:
-                input_content[0]["parts"].append({"spending_analysis":context_data})
 
             initial_response = await self.model.generate_content_async(input_content)
 
@@ -741,7 +781,7 @@ class RecommendationEngineAgent(BaseAgent):
                                 "tool_raw_output": tool_output
                             }
                         else:
-                            (f"RecommendationEngineAgent: Tool {function_call.name} execution failed: {tool_output.get('error')}")
+                            print(f"RecommendationEngineAgent: Tool {function_call.name} execution failed: {tool_output.get('error')}")
                             return {
                                 "status": "error",
                                 "message": f"Failed to get recommendation: Tool '{function_call.name}' failed with error: {tool_output.get('error')}",
@@ -763,8 +803,6 @@ class RecommendationEngineAgent(BaseAgent):
                 user_id=user_id
             )
             return {"status": "error", "message": "An internal error occurred while processing your request."}
-
-
 
     #helper cost_benefit and budget
     def _generate_optimization_scenarios(self, category: str, current_spend: float, transaction_count: int, avg_transaction: float) -> List[Dict]:
