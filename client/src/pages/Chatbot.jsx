@@ -1,150 +1,262 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from "react";
+import { IoMdAdd } from "react-icons/io";
+import { IoSend } from "react-icons/io5";
+import { Link } from "react-router-dom"; // Make sure this is at the top
+import { FiEdit2 } from "react-icons/fi";
+import { MdDashboard } from "react-icons/md";
+import { FaReceipt } from "react-icons/fa";
+import { getAuth } from "firebase/auth";
 
-// --- Icon Components (Self-contained SVGs for easy use) ---
-
-const RaseedLogoIcon = () => (
-  <div className="w-7 h-7 grid grid-cols-2 grid-rows-2 gap-0.5">
-    <div className="bg-blue-500 rounded-tl-md"></div>
-    <div className="bg-red-500 rounded-tr-md"></div>
-    <div className="bg-yellow-400 rounded-bl-md"></div>
-    <div className="bg-green-500 rounded-br-md"></div>
-  </div>
-);
-
-const PlusIcon = () => (
-  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-  </svg>
-);
-
-const BackArrowIcon = () => (
-  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
-  </svg>
-);
-
-const ReceiptIcon = () => (
-  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-  </svg>
-);
-
-const ReportIcon = () => (
-  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-  </svg>
-);
-
-const RobotIcon = () => (
-  <div className="w-10 h-10 flex-shrink-0 bg-blue-500 rounded-full flex items-center justify-center">
-    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
-  </div>
-);
-
-const MoreIcon = () => (
-  <svg className="w-6 h-6 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
-    <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z" />
-  </svg>
-);
-
-const MicIcon = () => (
-  <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-  </svg>
-);
-
-const SendIcon = () => (
-  <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
-    <path fillRule="evenodd" clipRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" />
-  </svg>
-);
-
-const InputModeIcon = () => (
-  <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-  </svg>
-);
-
-// --- Main Chatbot Component ---
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
 const Chatbot = () => {
+  const [chats, setChats] = useState([
+    {
+      id: 1,
+      title: "New Chat",
+      messages: [{ sender: "bot", text: "Hi! How can I help you today?" }],
+    },
+  ]);
+  const [activeChatIndex, setActiveChatIndex] = useState(0);
+  const [inputText, setInputText] = useState("");
+  const [isThinking, setIsThinking] = useState(false);
+  const inputRef = useRef(null);
+  const chatEndRef = useRef(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  const handleSendMessage = async (text) => {
+    if (!text.trim()) return;
+
+    const updatedChats = [...chats];
+    updatedChats[activeChatIndex].messages.push({ sender: "user", text });
+    updatedChats[activeChatIndex].messages.push({
+      sender: "bot",
+      text: "RASEED is thinking…",
+    });
+    setChats(updatedChats);
+    setInputText("");
+    setIsThinking(true);
+
+    try {
+      const auth = getAuth();
+      const user = auth.currentUser;
+      if (!user) throw new Error("User not authenticated");
+
+      const token = await user.getIdToken();
+
+      const response = await fetch(`${BACKEND_URL}/api/chat`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ query: text }),
+      });
+
+      const data = await response.json();
+      updatedChats[activeChatIndex].messages.pop(); // remove "thinking"
+      updatedChats[activeChatIndex].messages.push({
+        sender: "bot",
+        text: data.reply || "Something went wrong.",
+      });
+    } catch (e) {
+      console.error("Error sending message:", e);
+      updatedChats[activeChatIndex].messages.pop();
+      updatedChats[activeChatIndex].messages.push({
+        sender: "bot",
+        text: "Error getting response from RASEED.",
+      });
+    } finally {
+      setChats([...updatedChats]);
+      setIsThinking(false);
+      // inputRef.current?.focus();
+    }
+  };
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chats]);
+
+  const handleNewChat = () => {
+    const newChat = {
+      id: Date.now(),
+      title: "New Chat",
+      messages: [{ sender: "bot", text: "Hi! How can I help you today?" }],
+    };
+    setChats([newChat, ...chats]);
+    setActiveChatIndex(0);
+    setInputText("");
+    setTimeout(() => inputRef.current?.focus(), 50);
+  };
+
+  useEffect(() => {
+    if (!isThinking) {
+      inputRef.current?.focus();
+    }
+  }, [activeChatIndex, isThinking]);
+
   return (
-    <div className="font-sans flex w-full max-w-6xl h-full mx-auto bg-white border border-gray-200 rounded-lg shadow-lg">
+    <div className="flex h-full bg-white rounded-xl shadow-lg overflow-hidden">
       {/* Sidebar */}
-      <aside className="w-full max-w-xs bg-gray-50 p-6 border-r border-gray-200 flex flex-col space-y-8">
-        <div className="flex items-center space-x-2">
-          <RaseedLogoIcon />
-          <span className="text-2xl font-bold text-gray-800">RASEED</span>
+      <div className="w-1/4 bg-gray-100 p-4 border-r border-gray-200 flex flex-col">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-lg font-semibold text-gray-800">Chats</h2>
+          <button
+            onClick={handleNewChat}
+            className="p-2 bg-blue-500 text-white rounded-full hover:bg-blue-600"
+          >
+            <IoMdAdd />
+          </button>
         </div>
 
-        <button className="flex items-center space-x-3 text-lg font-semibold text-gray-700 w-full p-2 rounded-md hover:bg-gray-200 text-left">
-          <PlusIcon />
-          <span>New Chat</span>
-        </button>
-
-        <div className="flex-grow">
-          <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider">My Conversations</h3>
-          <ul className="mt-3 space-y-1 text-gray-700">
-            <li className="bg-blue-100 text-blue-800 font-semibold p-2 rounded-md cursor-pointer">Chat on: Amazon Rec...</li>
-            <li className="p-2 rounded-md hover:bg-gray-100 cursor-pointer">Chat on: Travel Expenses June</li>
-          </ul>
-        </div>
-
-        <div>
-          <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider">Quick Links</h3>
-          <ul className="mt-3 space-y-2 text-gray-600 font-medium">
-            <li className="flex items-center space-x-3 hover:text-black cursor-pointer"><BackArrowIcon /> <span>Back to Dashboard</span></li>
-            <li className="flex items-center space-x-3 hover:text-black cursor-pointer"><ReceiptIcon /> <span>My Receipts</span></li>
-            <li className="flex items-center space-x-3 hover:text-black cursor-pointer"><ReportIcon /> <span>Reports</span></li>
-          </ul>
-        </div>
-      </aside>
-
-      {/* Main Chat Area */}
-      <main className="w-full flex flex-col bg-white">
-        <header className="p-4 border-b border-gray-200 flex justify-between items-center flex-shrink-0">
-          <h2 className="text-lg font-semibold text-gray-800">Chat on: Amazon Receipts</h2>
-          <button><MoreIcon /></button>
-        </header>
-
-        <div className="flex-1 p-6 space-y-6 overflow-y-auto">
-          <div className="flex justify-end">
-            <div className="bg-gray-100 p-3 rounded-lg max-w-lg">
-              <p className="text-sm text-gray-800">How much did I spend on Amazon this month?</p>
+        {/* Chat list with rename buttons */}
+        <div className="flex-1 overflow-y-auto space-y-2">
+          {chats.map((chat, index) => (
+            <div
+              key={chat.id}
+              className={`group flex items-center justify-between p-3 rounded-lg cursor-pointer ${
+                index === activeChatIndex
+                  ? "bg-blue-100 text-blue-800 font-semibold"
+                  : "bg-white text-gray-800 hover:bg-gray-200"
+              }`}
+            >
+              <div
+                onClick={() => setActiveChatIndex(index)}
+                className="flex-1 truncate"
+              >
+                {chat.title}
+              </div>
+              <button
+                onClick={() => {
+                  const newTitle = prompt("Rename chat:", chat.title);
+                  if (newTitle) {
+                    const updatedChats = [...chats];
+                    updatedChats[index].title = newTitle;
+                    setChats(updatedChats);
+                  }
+                }}
+                className="ml-2 text-gray-500 hover:text-gray-700"
+              >
+                <FiEdit2 size={16} />
+              </button>
             </div>
-          </div>
-
-          <div className="flex items-start space-x-3">
-            <RobotIcon />
-            <div className="bg-gray-100 p-3 rounded-lg max-w-lg">
-              <p className="font-bold text-sm text-gray-900">Raseed Assistant</p>
-              <p className="text-sm text-gray-800">You spent $1,200 on Amazon this month.</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3 pt-4">
-            <button className="bg-blue-500 text-white font-semibold py-3 px-4 rounded-lg hover:bg-blue-600 text-sm">Summarize My Receipts</button>
-            <button className="bg-yellow-400 text-black font-semibold py-3 px-4 rounded-lg hover:bg-yellow-500 text-sm">Find Unusual Transactions</button>
-            <button className="bg-red-500 text-white font-semibold py-3 px-4 rounded-lg hover:bg-red-600 text-sm">Top Spending Categories</button>
-            <button className="bg-green-500 text-white font-semibold py-3 px-4 rounded-lg hover:bg-green-600 text-sm">Download Report</button>
-          </div>
+          ))}
         </div>
 
-        <div className="p-4 border-t border-gray-200 flex-shrink-0">
-          <div className="flex items-center space-x-3 bg-white border border-gray-300 rounded-lg p-2 focus-within:ring-2 focus-within:ring-blue-500">
-            <InputModeIcon />
-            <input 
-              type="text" 
-              placeholder="What's my highest spend this week?" 
-              className="w-full bg-transparent focus:outline-none text-sm"
+
+
+{/* Footer Quick Links */}
+<hr className="my-4 border-gray-300" />
+<h4 className="text-sm font-medium text-gray-500 mb-2">Quick Links</h4>
+<div className="space-y-3">
+  <Link
+    to="/dashboard"
+    className="flex items-center space-x-2 text-gray-700 hover:text-blue-600"
+  >
+    <MdDashboard size={20} />
+    <span>Dashboard</span>
+  </Link>
+  <Link
+    to="/receipts"
+    className="flex items-center space-x-2 text-gray-700 hover:text-blue-600"
+  >
+    <FaReceipt size={18} />
+    <span>My Receipts</span>
+  </Link>
+</div>
+</div>
+
+      {/* Chat Area */}
+      <div className="w-3/4 flex flex-col">
+        <div className="ml-3 p-4 border-b border-gray-200 bg-white">
+          <h3 className="text-md font-semibold text-gray-800">
+            {chats[activeChatIndex]?.title || "Chat"}
+          </h3>
+        </div>
+
+        {/* Prompt Buttons */}
+        <div className="px-6 py-4 space-x-3 flex flex-wrap">
+          {[
+            { label: "Summarize My Receipts", color: "bg-blue-500" },
+            { label: "What Did I Spend The Most On?", color: "bg-red-500" },
+            { label: "Any Unusual Expenses?", color: "bg-green-500" },
+            {
+              label: "How Can I Save More?",
+              color: "bg-yellow-500 text-black",
+            },
+          ].map((btn, idx) => (
+            <button
+              key={idx}
+              onClick={() => handleSendMessage(btn.label)}
+              className={`text-white px-4 py-2 rounded-md hover:opacity-90 transition ${btn.color}`}
+            >
+              {btn.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 hide-scrollbar">
+          {chats[activeChatIndex]?.messages.map((msg, idx) => (
+            <div
+              key={idx}
+              className={`flex ${
+                msg.sender === "user" ? "justify-end" : "justify-start"
+              }`}
+            >
+              <div
+                className={`px-4 py-2 rounded-lg max-w-xs ${
+                  msg.sender === "user"
+                    ? "bg-blue-500 text-white"
+                    : "bg-gray-200 text-gray-800"
+                }`}
+              >
+                {msg.text}
+              </div>
+            </div>
+          ))}
+          <div ref={chatEndRef} />
+        </div>
+
+        {/* Input */}
+        <div className="p-4 border-t border-gray-200 bg-white">
+          <form
+            className="flex items-center space-x-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSendMessage(inputText);
+            }}
+          >
+            <input
+              ref={inputRef}
+              type="text"
+              className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder={
+                isThinking ? "RASEED is thinking..." : "Type your message..."
+              }
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              disabled={isThinking}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSendMessage(inputText);
+                }
+              }}
             />
-            <button><MicIcon /></button>
-            <button className="bg-blue-500 p-2 rounded-md hover:bg-blue-600"><SendIcon /></button>
-          </div>
+            <button
+              type="submit"
+              disabled={isThinking}
+              className="p-2 bg-blue-500 text-white rounded-full hover:bg-blue-600"
+            >
+              <IoSend size={20} />
+            </button>
+          </form>
         </div>
-      </main>
+      </div>
     </div>
   );
 };

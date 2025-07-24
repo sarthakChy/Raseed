@@ -40,6 +40,7 @@ import requests as req
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 import vertexai
+from vertexai.generative_models import GenerativeModel
 
 import firebase_admin
 from firebase_admin import credentials, auth
@@ -113,6 +114,7 @@ async def firebase_auth_required(request: Request):
     try:
         decoded_token = auth.verify_id_token(token)
         request.state.user = decoded_token
+        return decoded_token
     except Exception as e:
         logging.error(f"Token verification failed: {e}")
         raise HTTPException(status_code=401, detail="Invalid or expired token.")
@@ -147,6 +149,10 @@ async def analyze_receipt(
         processedAt = datetime.now()
         parsed_data = parse_json(response.text) 
 
+        #Get user data
+        user_id = auth.get("uid")
+        email = auth.get("email")
+
         #Save the receipt to cloud storage and Firestore
         receipt_data = save_receipt_to_cloud(
                     db=db,
@@ -156,7 +162,9 @@ async def analyze_receipt(
                     file=file,
                     uploadedAt = uploadedAt,
                     processedAt = processedAt,
-                    uuid = str(uuid.uuid4()),
+                    receipt_id = str(uuid.uuid4()),
+                    user_id = user_id,
+                    email = email
                 )
 
         return JSONResponse(content=receipt_data, status_code=200)
@@ -372,41 +380,42 @@ async def update_wallet_pass(
         logger.error(f"Internal error updating wallet pass: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error"})
 
+# ============================= Chat ===============================================
+
 @app.post("/chat")
 async def chat_handler(
     request: Request,
-    # auth=Depends(firebase_auth_required),
+    auth=Depends(firebase_auth_required),
     body: dict = Body(...)
 ):
     try:
-        orchestrator = MasterOrchestrator(
-            project_id=os.getenv("PROJECT_ID"),  # dummy project id
-            config_path="config/agent_config.yaml",
-            location="us-central1",
-            model_name="gemini-2.0-flash-001"
-        )
+        # orchestrator = MasterOrchestrator(
+        #     project_id=os.getenv("PROJECT_ID"),  # dummy project id
+        #     config_path="config/agent_config.yaml",
+        #     location="us-central1",
+        #     model_name="gemini-2.0-flash-001"
+        # )
+        user_query = body['query']
 
-        user_query = "Help me save money on shopping"
+        # # Provide dummy user_id and optional context
+        # result = await orchestrator.process_query(
+        #     query=user_query,
+        #     user_id="a73ff731-9018-45ed-86ff-214e91baf702",
+        #     additional_context={
+        #         "currency": "USD",
+        #         "timezone": "America/New_York",
+        #         "preferred_categories": ["groceries", "food", "transport"]
+        #     }
+        # )
 
-        # Provide dummy user_id and optional context
-        result = await orchestrator.process_query(
-            query=user_query,
-            user_id="a73ff731-9018-45ed-86ff-214e91baf702",
-            additional_context={
-                "currency": "USD",
-                "timezone": "America/New_York",
-                "preferred_categories": ["groceries", "food", "transport"]
-            }
-        )
-
-        print("----- Final Orchestrator Response -----")
-        print(result)
+        # print("----- Final Orchestrator Response -----")
+        # print(result)
         # user_message = body.get("message")
         # if not user_message:
         #     raise HTTPException(status_code=400, detail="Missing 'message' in body.")
 
-        # model = GenerativeModel("gemini-2.0-flash-001")
-        # chat = model.start_chat()
+        model = GenerativeModel("gemini-2.0-flash-001")
+        chat = model.start_chat()
 
         # response = chat.send_message(user_message)
 
@@ -417,6 +426,32 @@ async def chat_handler(
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
     
+# ============================= Receipt History ===============================================
+
+@app.get("/receipts/user/{user_id}")
+async def get_user_receipts(
+    user_id: str,
+    request: Request,
+    auth=Depends(firebase_auth_required)
+):
+    try:
+        # Fetch receipts for the given user ID
+        receipts_ref = db.collection("receiptQueue").where("userId", "==", user_id)
+        docs = receipts_ref.stream()
+        
+        receipts = []
+        for doc in docs:
+            receipt_data = doc.to_dict()
+            receipt_data["receiptId"] = doc.id
+            receipts.append(receipt_data)
+
+        return JSONResponse(content={"status": "success", "receipts": receipts}, status_code=200)
+
+    except Exception as e:
+        logging.error(f"Error fetching receipts for user {user_id}: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Failed to fetch receipts")
+
 
 @app.post("/orchestrator/query")
 async def orchestrator_query(

@@ -1,72 +1,33 @@
-import React from 'react';
-import { 
-  FaSearch, 
-  FaAngleDown, 
-  FaListUl, 
-  FaGoogle, 
-  FaRegListAlt, 
-  FaTable, 
-  FaShoppingCart, 
-  FaUtensils, 
-  FaCheck, 
-  FaBan 
+import React, { useState, useEffect } from 'react';
+import {
+  FaSearch,
+  FaAngleDown,
+  FaListUl,
+  FaGoogle,
+  FaRegListAlt,
+  FaTable,
+  FaShoppingCart,
+  FaUtensils,
+  FaCheck,
+  FaBan,
+  FaLaptop,
+  FaLeaf,
+  FaTshirt,
+  FaHeartbeat,
+  FaBus,
+  FaBolt,
+  FaQuestionCircle,
 } from 'react-icons/fa';
+import { getAuth } from 'firebase/auth';
+import ReceiptDetailsDialog from '../components/ReceiptDetailsDialog';
+import { useNavigate } from 'react-router-dom';
 
-// --- Type Definitions ---
-type Receipt = {
-  id: number;
-  icon: React.ElementType;
-  storeName: string;
-  date: string;
-  amount: string;
-  subText: string;
-  category: 'Groceries' | 'Dining' | 'Electronics' | 'Not Added';
-};
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
-// --- Mock Data ---
-const receiptsData: Receipt[] = [
-  {
-    id: 1,
-    icon: FaListUl,
-    storeName: 'Supermart',
-    date: 'Jul 20, 2025',
-    amount: '₹1,234.56',
-    subText: 'Total av',
-    category: 'Groceries',
-  },
-  {
-    id: 2,
-    icon: FaGoogle,
-    storeName: 'Coffee Cafe',
-    date: 'Jul 12, 2025',
-    amount: '₹180.00',
-    subText: 'Total av',
-    category: 'Dining',
-  },
-  {
-    id: 3,
-    icon: FaTable,
-    storeName: 'Store Name',
-    date: 'Jun 30, 2025',
-    amount: '₹2,500.00',
-    subText: 'Total av',
-    category: 'Electronics',
-  },
-  {
-    id: 4,
-    icon: FaRegListAlt,
-    storeName: 'Market Bazaar',
-    date: 'June 21, 2025',
-    amount: '₹325.00',
-    subText: 'Groceries',
-    category: 'Not Added',
-  },
-];
-
-// --- Reusable Category Tag Component ---
-const CategoryTag = ({ category }: { category: Receipt['category'] }) => {
+// --- Category Tag Component ---
+const CategoryTag = ({ category }) => {
   const styles = {
-    Groceries: {
+    Shopping: {
       bg: 'bg-green-100',
       text: 'text-green-700',
       icon: <FaShoppingCart />,
@@ -77,29 +38,58 @@ const CategoryTag = ({ category }: { category: Receipt['category'] }) => {
       icon: <FaUtensils />,
     },
     Electronics: {
-      bg: 'bg-green-100',
-      text: 'text-green-700',
-      icon: <FaCheck />,
+      bg: 'bg-blue-100',
+      text: 'text-blue-700',
+      icon: <FaLaptop />,
+    },
+    Grocery: {
+      bg: 'bg-lime-100',
+      text: 'text-lime-700',
+      icon: <FaLeaf />,
+    },
+    Groceries: {
+      bg: 'bg-lime-100',
+      text: 'text-lime-700',
+      icon: <FaLeaf />,
+    },
+    Clothing: {
+      bg: 'bg-pink-100',
+      text: 'text-pink-700',
+      icon: <FaTshirt />,
+    },
+    Healthcare: {
+      bg: 'bg-red-100',
+      text: 'text-red-700',
+      icon: <FaHeartbeat />,
+    },
+    Travel: {
+      bg: 'bg-cyan-100',
+      text: 'text-cyan-700',
+      icon: <FaBus />,
+    },
+    Utilities: {
+      bg: 'bg-indigo-100',
+      text: 'text-indigo-700',
+      icon: <FaBolt />,
     },
     'Not Added': {
       bg: 'bg-gray-200',
       text: 'text-gray-600',
-      icon: <FaBan />,
+      icon: <FaQuestionCircle />, // better icon for unknown
     },
   };
 
-  const style = styles[category];
+  const { bg, text, icon } = styles[category] || styles['Not Added'];
 
   return (
-    <div className={`flex items-center space-x-2 py-1 px-3 rounded-full text-sm font-medium ${style.bg} ${style.text}`}>
-      {style.icon}
-      <span>{category}</span>
-    </div>
+    <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium ${bg} ${text}`}>
+      {icon} {category}
+    </span>
   );
 };
 
-// --- Reusable Receipt Row Component ---
-const ReceiptRow = ({ receipt }: { receipt: Receipt }) => (
+// --- Receipt Row Component ---
+const ReceiptRow = ({ receipt, onView }) => (
   <div className="flex items-center space-x-4 p-4 border-b border-gray-200 last:border-b-0">
     <div className="bg-gray-100 p-3 rounded-lg text-gray-600">
       <receipt.icon size={20} />
@@ -116,7 +106,7 @@ const ReceiptRow = ({ receipt }: { receipt: Receipt }) => (
       <CategoryTag category={receipt.category} />
     </div>
     <div className="flex items-center space-x-6 text-gray-600 font-medium">
-      <button className="hover:text-blue-600">View</button>
+      <button className="hover:text-blue-600" onClick={() => onView(receipt)}>View</button>
       <button className="hover:text-red-600">Delete</button>
     </div>
   </div>
@@ -125,11 +115,102 @@ const ReceiptRow = ({ receipt }: { receipt: Receipt }) => (
 
 // --- Main History Component ---
 const History = () => {
+  const navigate = useNavigate();
+  const [receipts, setReceipts] = useState([]);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedReceipt, setSelectedReceipt] = useState(null);
+
+  useEffect(() => {
+    const fetchReceipts = async () => {
+  try {
+    const auth = getAuth();
+    const user = auth.currentUser;
+
+    if (!user) {
+      console.warn("User not authenticated.");
+      setLoading(false);
+      return;
+    }
+
+    const token = await user.getIdToken();
+    const userId = user.uid;
+
+    const response = await fetch(`${BACKEND_URL}/receipts/user/${userId}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    const transformed = data.receipts.map((r) => {
+      const extracted = r.ocrData?.extractedData || {};
+
+      const iconMap = {
+        Shopping: FaShoppingCart,
+        Dining: FaUtensils,
+        Electronics: FaLaptop,
+        Grocery: FaLeaf,
+        Clothing: FaTshirt,
+        Healthcare: FaHeartbeat,
+        Travel: FaBus,
+        Utilities: FaBolt,
+      };
+
+      const titlecase = (str) => {
+        if (typeof str !== 'string') return 'Not Added';
+        return str
+          .toLowerCase()
+          .replace(/_/g, ' ')
+          .split(' ')
+          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(' ');
+      };
+
+      const category = titlecase(extracted.category);
+      const payment = titlecase(extracted.paymentMethod);
+
+      const formattedDate = new Date(r.processedAt).toLocaleDateString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      });
+
+      return {
+        id: r.receiptId,
+        icon: iconMap[category] || FaListUl,
+        storeName: extracted.merchantName || "Unknown Store",
+        date: formattedDate,
+        amount: `₹${(extracted.totalAmount || 0).toFixed(2)}`,
+        subText: payment || 'Unknown',
+        category,
+        fullData: extracted,
+      };
+    });
+
+    setReceipts(transformed);
+  } catch (error) {
+    console.error("Error fetching receipts:", error);
+  } finally {
+    setLoading(false);
+  }
+};
+
+
+    fetchReceipts();
+  }, []);
+  
+  const [loading, setLoading] = useState(true);
+
+
   return (
     <div className="bg-gray-50 h-full p-4 sm:p-8">
       <div className="max-w-7xl mx-auto bg-white p-8 rounded-2xl border border-gray-200">
-        
-        {/* Header Section */}
+        {/* Header */}
         <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
           <h1 className="text-3xl font-bold text-gray-800 mb-4 sm:mb-0">
             Receipts History
@@ -154,19 +235,34 @@ const History = () => {
           </div>
         </header>
 
-        {/* Receipts List */}
+        {/* Receipt List */}
         <div className="bg-white rounded-lg border border-gray-200">
-          {receiptsData.map(receipt => (
-            <ReceiptRow key={receipt.id} receipt={receipt} />
-          ))}
+          {loading ? (
+  <div className="p-6 text-center text-gray-500">Loading receipts...</div>
+) : receipts.length === 0 ? (
+  <div className="p-6 text-center text-gray-500">No receipts available.</div>
+) : (
+  receipts.map((receipt) => (
+    <ReceiptRow
+      key={receipt.id}
+      receipt={receipt}
+      onView={(r) => {
+        setSelectedReceipt(r);
+        setDialogOpen(true);
+      }}
+    />
+  ))
+)}
         </div>
 
-        {/* Action Buttons */}
+        {/* Actions */}
         <footer className="flex justify-start items-center space-x-4 mt-8">
-          <button className="bg-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-700 transition-colors">
+          {/* <button className="bg-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-700 transition-colors">
             Edit Receipts
-          </button>
-          <button className="bg-white text-gray-800 font-bold py-3 px-6 rounded-lg border-2 border-gray-300 hover:bg-gray-100 transition-colors">
+          </button> */}
+          <button className="bg-white text-gray-800 font-bold py-3 px-6 rounded-lg border-2 border-gray-300 hover:bg-gray-100 transition-colors"
+            onClick={() => navigate('/dashboard')}
+          >
             View Dashboard
           </button>
           <button className="bg-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-700 transition-colors">
@@ -175,6 +271,11 @@ const History = () => {
         </footer>
 
       </div>
+      <ReceiptDetailsDialog
+  isOpen={dialogOpen}
+  onClose={() => setDialogOpen(false)}
+  receipt={selectedReceipt}
+/>
     </div>
   );
 };
