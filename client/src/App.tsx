@@ -69,6 +69,8 @@ import UpgradeComponent from './pages/Upgrade';
 import GetStarted from './pages/GetStarted';
 import Chatbot from "./pages/Chatbot";
 import DashBoard from "./pages/Dash.tsx";
+import History from "./pages/History.tsx";
+import ScanRecipts from "./pages/ScanRecipts.tsx";
 
 
 const Upgrade = () => <UpgradeComponent />; // Using the corrected UpgradePlan component
@@ -88,6 +90,8 @@ const App: React.FC = () => {
               <Route path="/contact" element={<Contact />} />
               <Route path="/chatbot" element={<Chatbot />} />
               <Route path="/dashboard" element={<DashBoard />} />
+              <Route path="/history" element={<History />} />
+              <Route path="/scanrecipts" element={<ScanRecipts />} />
             </Routes>
           </main>
         </div>
