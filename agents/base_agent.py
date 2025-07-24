@@ -100,28 +100,28 @@ class BaseAgent(ABC):
         )
         
         # Database Query Tool
-        database_tool = FunctionDeclaration(
-            name="execute_database_query",
-            description="Execute SQL queries against the financial database",
-            parameters={
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "SQL query to execute"
-                    },
-                    "parameters": {
-                        "type": "object",
-                        "description": "Query parameters for parameterized queries"
-                    },
-                    "cache_key": {
-                        "type": "string",
-                        "description": "Optional cache key for query results"
-                    }
-                },
-                "required": ["query"]
-            }
-        )
+        # database_tool = FunctionDeclaration(
+        #     name="execute_database_query",
+        #     description="Execute SQL queries against the financial database",
+        #     parameters={
+        #         "type": "object",
+        #         "properties": {
+        #             "query": {
+        #                 "type": "string",
+        #                 "description": "SQL query to execute"
+        #             },
+        #             "parameters": {
+        #                 "type": "object",
+        #                 "description": "Query parameters for parameterized queries"
+        #             },
+        #             "cache_key": {
+        #                 "type": "string",
+        #                 "description": "Optional cache key for query results"
+        #             }
+        #         },
+        #         "required": ["query"]
+        #     }
+        # )
         
         # Error Logging Tool
         error_logging_tool = FunctionDeclaration(
@@ -148,7 +148,7 @@ class BaseAgent(ABC):
         )
         
         # Create tools and add to registry
-        base_tools = [user_profile_tool, database_tool, error_logging_tool]
+        base_tools = [user_profile_tool, error_logging_tool]
         self.vertex_tools.extend(base_tools)
         
         # Register tool execution functions
