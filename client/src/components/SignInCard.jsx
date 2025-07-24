@@ -49,7 +49,6 @@ export default function SignInCard() {
           </h2>
         </div>
 
-=======
   return (
       <div className="w-full max-w-sm bg-white p-6 sm:p-5 rounded-xl shadow-md">
         <div className="text-center">
@@ -61,7 +60,6 @@ export default function SignInCard() {
           </h2>
         </div>
 
->>>>>>> 1cd74f5 (TSX -> JSX + Auth-Setup)
         <form onSubmit={handleSubmit} className="mt-5 space-y-4">
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-900">
