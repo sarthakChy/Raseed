@@ -183,18 +183,6 @@ class BaseAgent(ABC):
         Registers a new tool (FunctionDeclaration) with the agent.
         """
         tool_name = tool_declaration._raw_function_declaration.name
-<<<<<<< HEAD
-
-        # Remove any existing declaration with the same name
-        self.vertex_tools = [
-            fd for fd in self.vertex_tools if fd._raw_function_declaration.name != tool_name
-        ]
-
-        # Add the new tool declaration to the flat list
-        self.vertex_tools.append(tool_declaration)
-        self.tools_registry[tool_declaration._raw_function_declaration.name] = executor_func
-=======
->>>>>>> 1a81f53 (Insight Agent Setup)
 
         # Remove any existing declaration with the same name
         self.vertex_tools = [

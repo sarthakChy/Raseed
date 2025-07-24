@@ -457,6 +457,43 @@ async def get_user_receipts(
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Failed to fetch receipts")
 
+# ============================= Receipt Delete ===============================================
+
+@app.delete("/receipts/{receipt_id}")
+async def delete_receipt(
+    receipt_id: str,
+    request: Request,
+    auth=Depends(firebase_auth_required)
+):
+    try:
+        # Reference the document in Firestore
+        doc_ref = db.collection("receiptQueue").document(receipt_id)
+
+        # Check if the document exists before attempting deletion
+        doc = doc_ref.get()
+        if not doc.exists:
+            raise HTTPException(status_code=404, detail="Receipt not found")
+
+        # Optional: verify that the user owns this receipt
+        user_id = request.state.user["uid"]
+        if doc.to_dict().get("userId") != user_id:
+            raise HTTPException(status_code=403, detail="You are not authorized to delete this receipt")
+
+        # Delete the document
+        doc_ref.delete()
+
+        return JSONResponse(
+            content={"status": "success", "message": f"Receipt {receipt_id} deleted successfully"},
+            status_code=200
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error deleting receipt {receipt_id}: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Failed to delete receipt")
+
 
 @app.post("/orchestrator/query")
 async def orchestrator_query(

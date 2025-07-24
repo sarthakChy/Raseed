@@ -58,11 +58,6 @@ const ScanReceipts = () => {
       });
 
       const result = await response.json();
-<<<<<<< HEAD
-=======
-      console.log(result);
-      
->>>>>>> d4fd31b (Frontend Integration - History, Scan, Chat)
       if (response.ok) {
         setAnalysisStatus('success');
         setAnalysisResult(result);

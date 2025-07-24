@@ -40,7 +40,11 @@ export default function SignUpCard() {
     <div className="flex min-h-full flex-col justify-center px-4 py-6 sm:px-6 lg:px-8 w-full max-w-sm mx-auto bg-white rounded-xl shadow-md">
       <div className="text-center">
         <button onClick={() => navigate("/")}>
-          <img alt="Your Company" src="/raseed-logo.png" className="h-16 w-auto mx-auto" />
+          <img
+            alt="Your Company"
+            src="/raseed-logo.png"
+            className="h-16 w-auto mx-auto"
+          />
         </button>
         <h2 className="mt-2 text-xl font-bold tracking-tight text-gray-900">
           Create your Florette account
@@ -74,9 +78,7 @@ export default function SignUpCard() {
             </div>
           ))}
 
-          {isError && (
-            <p className="text-sm text-[#DB4437]">{error.message}</p>
-          )}
+          {isError && <p className="text-sm text-[#DB4437]">{error.message}</p>}
 
           <div>
             <button

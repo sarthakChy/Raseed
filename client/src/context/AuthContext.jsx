@@ -29,7 +29,11 @@ export function AuthProvider({ children }) {
 
   // Email/password signup
   const signUp = async ({ email, password, name }) => {
-    const userCred = await createUserWithEmailAndPassword(auth, email, password);
+    const userCred = await createUserWithEmailAndPassword(
+      auth,
+      email,
+      password
+    );
     await updateProfile(userCred.user, { displayName: name });
     setUser({ ...userCred.user });
     return userCred.user;

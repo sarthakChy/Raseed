@@ -1,13 +1,13 @@
-import React from 'react';
+import React from "react";
 import {
   FaFacebookF,
   FaShareAlt,
   FaLinkedinIn,
   FaInstagram,
-} from 'react-icons/fa';
+} from "react-icons/fa";
 
 // Social Icon Button
-const SocialIcon = ({ icon, bgColor, href = '#' }) => (
+const SocialIcon = ({ icon, bgColor, href = "#" }) => (
   <a
     href={href}
     target="_blank"
@@ -37,7 +37,7 @@ const Contact = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
     // TODO: handle message sending logic
-    console.log('Form submitted');
+    console.log("Form submitted");
   };
 
   return (
@@ -48,10 +48,7 @@ const Contact = () => {
       </h2>
 
       {/* Contact Form */}
-      <form
-        onSubmit={handleSubmit}
-        className="max-w-2xl mx-auto mb-12"
-      >
+      <form onSubmit={handleSubmit} className="max-w-2xl mx-auto mb-12">
         <div className="flex items-center bg-white p-2 rounded-full border border-gray-300 shadow-sm focus-within:ring-2 focus-within:ring-blue-500">
           <textarea
             name="message"

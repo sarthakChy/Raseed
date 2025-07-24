@@ -1,6 +1,12 @@
-import React from 'react';
-
-import { FaRobot, FaCloudUploadAlt, FaFileInvoice, FaStar, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
+import React from "react";
+import {
+  FaRobot,
+  FaCloudUploadAlt,
+  FaFileInvoice,
+  FaStar,
+  FaChevronLeft,
+  FaChevronRight,
+} from "react-icons/fa";
 import {
   SiGooglecloud,
   SiNextdotjs,
@@ -11,13 +17,13 @@ import {
   SiMongodb,
   SiFirebase,
   SiPostman,
-} from 'react-icons/si';
+} from "react-icons/si";
 
 // StarRating component
 const StarRating = ({ rating }) => (
   <div className="flex text-yellow-400 mb-2">
     {[...Array(5)].map((_, i) => (
-      <FaStar key={i} color={i < rating ? undefined : 'lightgray'} />
+      <FaStar key={i} color={i < rating ? undefined : "lightgray"} />
     ))}
   </div>
 );
@@ -25,15 +31,20 @@ const StarRating = ({ rating }) => (
 // FeatureItem component (no longer used but left for reference)
 const FeatureItem = ({ side, color, title, description }) => (
   <div className="flex justify-between items-center w-full">
-    {side === 'right' && <div className="w-5/12"></div>}
+    {side === "right" && <div className="w-5/12"></div>}
     <div className="w-1/12 flex justify-center">
-      <div className="w-4 h-4 rounded-full z-10" style={{ backgroundColor: color }}></div>
+      <div
+        className="w-4 h-4 rounded-full z-10"
+        style={{ backgroundColor: color }}
+      ></div>
     </div>
-    <div className={`w-5/12 px-4 ${side === 'left' ? 'text-right' : 'text-left'}`}>
+    <div
+      className={`w-5/12 px-4 ${side === "left" ? "text-right" : "text-left"}`}
+    >
       <h3 className="font-bold text-lg">{title}</h3>
       <p className="text-gray-600">{description}</p>
     </div>
-    {side === 'left' && <div className="w-5/12"></div>}
+    {side === "left" && <div className="w-5/12"></div>}
   </div>
 );
 
@@ -44,12 +55,16 @@ const AboutPage = () => {
       <section className="py-16 px-4">
         <div className="container mx-auto flex flex-col md:flex-row items-center justify-center">
           <div className="md:w-1/2 text-center md:text-left">
-            <h2 className="text-4xl font-bold text-blue-600 mb-4">What's RASEED?</h2>
+            <h2 className="text-4xl font-bold text-blue-600 mb-4">
+              What's RASEED?
+            </h2>
             <p className="text-xl text-gray-700 mb-2">
-              Raseed is an AI platform that helps you make sense of your receipts and meetings.
+              Raseed is an AI platform that helps you make sense of your
+              receipts and meetings.
             </p>
             <p className="text-gray-600">
-              It organizes your data, finds patterns, and reminds you of what to do next – so nothing slips through the cracks.
+              It organizes your data, finds patterns, and reminds you of what to
+              do next – so nothing slips through the cracks.
             </p>
           </div>
           <div className="md:w-1/2 flex justify-center mt-8 md:mt-0">
@@ -66,12 +81,15 @@ const AboutPage = () => {
       <section className="py-16 px-4">
         <div className="container mx-auto flex flex-col md:flex-row-reverse items-center justify-center">
           <div className="md:w-1/2 text-center md:text-left md:pl-12">
-            <h2 className="text-4xl font-bold text-red-500 mb-4">RASEED is Built to Bring Clarity to Chaos.</h2>
+            <h2 className="text-4xl font-bold text-red-500 mb-4">
+              RASEED is Built to Bring Clarity to Chaos.
+            </h2>
             <p className="text-xl text-gray-700 mb-2">
               Organizing receipts and finances shouldn't be a burden.
             </p>
             <p className="text-gray-600">
-              RASEED transforms your scattered records into valuable, actionable insights.
+              RASEED transforms your scattered records into valuable, actionable
+              insights.
             </p>
           </div>
           <div className="md:w-1/2 flex justify-center mt-8 md:mt-0">
@@ -86,7 +104,9 @@ const AboutPage = () => {
 
       {/* How will RASEED help? */}
       <section className="py-16 px-4 text-center">
-        <h2 className="text-4xl font-bold text-yellow-600 mb-8">How will RASEED help?</h2>
+        <h2 className="text-4xl font-bold text-yellow-600 mb-8">
+          How will RASEED help?
+        </h2>
         <div className="container mx-auto flex flex-col md:flex-row items-center justify-around">
           <div className="text-gray-700 text-xl italic space-y-4">
             <p>"Receipts & meeting notes are messy and often ignored."</p>
@@ -134,26 +154,68 @@ const AboutPage = () => {
       {/* Features Section */}
       <section className="py-16 px-4">
         <div className="mb-12">
-          <h2 className="text-3xl font-bold text-center mb-8">Features of RASEED</h2>
+          <h2 className="text-3xl font-bold text-center mb-8">
+            Features of RASEED
+          </h2>
           <div className="relative">
             <div className="border-l-2 border-gray-400 absolute h-full left-1/2 -translate-x-1/2"></div>
             <div className="space-y-8">
               {[
-                ['Smart Uploads', 'Upload Receipts via Photo, Video, or Stream', 'bg-blue-500'],
-                ['Multilingual Parsing', 'Multilingual Receipt Parsing', 'bg-red-500'],
-                ['Regional Language Queries', 'Ask Queries in Hindi, Tamil, Arabic & More', 'bg-yellow-500'],
-                ['Insights & Trends', 'See Spending Patterns & Trends', 'bg-green-500'],
-                ['Google Wallet Integration', 'Structured Receipt Pass in Google Wallet', 'bg-blue-500'],
-                ['Reorder Suggestions', 'Shopping List & Reorder Recommendations', 'bg-red-500'],
+                [
+                  "Smart Uploads",
+                  "Upload Receipts via Photo, Video, or Stream",
+                  "bg-blue-500",
+                ],
+                [
+                  "Multilingual Parsing",
+                  "Multilingual Receipt Parsing",
+                  "bg-red-500",
+                ],
+                [
+                  "Regional Language Queries",
+                  "Ask Queries in Hindi, Tamil, Arabic & More",
+                  "bg-yellow-500",
+                ],
+                [
+                  "Insights & Trends",
+                  "See Spending Patterns & Trends",
+                  "bg-green-500",
+                ],
+                [
+                  "Google Wallet Integration",
+                  "Structured Receipt Pass in Google Wallet",
+                  "bg-blue-500",
+                ],
+                [
+                  "Reorder Suggestions",
+                  "Shopping List & Reorder Recommendations",
+                  "bg-red-500",
+                ],
               ].map(([title, desc, color], index) => {
                 const isLeft = index % 2 === 0;
                 return (
                   <div className="flex justify-center items-center" key={index}>
-                    <div className="w-5/12 text-right pr-8">{isLeft && <><h3 className="text-xl font-semibold">{title}</h3><p>{desc}</p></>}</div>
-                    <div className="w-1/12 flex justify-center">
-                      <div className={`w-4 h-4 ${color} rounded-full z-10`}></div>
+                    <div className="w-5/12 text-right pr-8">
+                      {isLeft && (
+                        <>
+                          <h3 className="text-xl font-semibold">{title}</h3>
+                          <p>{desc}</p>
+                        </>
+                      )}
                     </div>
-                    <div className="w-5/12 text-left pl-8">{!isLeft && <><h3 className="text-xl font-semibold">{title}</h3><p>{desc}</p></>}</div>
+                    <div className="w-1/12 flex justify-center">
+                      <div
+                        className={`w-4 h-4 ${color} rounded-full z-10`}
+                      ></div>
+                    </div>
+                    <div className="w-5/12 text-left pl-8">
+                      {!isLeft && (
+                        <>
+                          <h3 className="text-xl font-semibold">{title}</h3>
+                          <p>{desc}</p>
+                        </>
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -166,15 +228,21 @@ const AboutPage = () => {
 
       {/* How It's Built */}
       <section className="py-16 px-4 text-center">
-        <h2 className="text-4xl font-bold text-red-500 mb-12">How's RASEED built?</h2>
+        <h2 className="text-4xl font-bold text-red-500 mb-12">
+          How's RASEED built?
+        </h2>
         <div className="container mx-auto">
-          <h3 className="text-2xl font-semibold mb-4">Google Cloud & AI Tools</h3>
+          <h3 className="text-2xl font-semibold mb-4">
+            Google Cloud & AI Tools
+          </h3>
           <div className="flex justify-center items-center space-x-6 text-5xl text-gray-700 p-4 bg-gray-100 rounded-lg">
             <SiGooglecloud className="text-blue-500" />
             <SiFirebase className="text-yellow-500" />
           </div>
 
-          <h3 className="text-2xl font-semibold mb-4 mt-12">Design, Implementation, and Working</h3>
+          <h3 className="text-2xl font-semibold mb-4 mt-12">
+            Design, Implementation, and Working
+          </h3>
           <div className="flex justify-center items-center flex-wrap gap-6 text-5xl text-gray-700 p-4 bg-gray-100 rounded-lg">
             <SiReact className="text-blue-400" />
             <SiJavascript className="text-yellow-400" />
@@ -191,16 +259,38 @@ const AboutPage = () => {
 
       {/* User Testimonials */}
       <section className="py-16 px-4 bg-gray-50">
-        <h2 className="text-4xl font-bold text-center mb-12">User Testimonials</h2>
+        <h2 className="text-4xl font-bold text-center mb-12">
+          User Testimonials
+        </h2>
         <div className="container mx-auto flex items-center justify-center">
-          <button className="text-3xl text-gray-400 hover:text-gray-600"><FaChevronLeft /></button>
+          <button className="text-3xl text-gray-400 hover:text-gray-600">
+            <FaChevronLeft />
+          </button>
           <div className="flex flex-col md:flex-row space-y-8 md:space-y-0 md:space-x-8 px-4">
             {[
-              ["The way RASEED breaks down insights is perfect for students managing budgets.", "Ayesha Khan", "Finance Student", 5],
-              ["Helped me track 50+ client payments this quarter. The follow-up reminders saved me from chasing emails all week!", "Neha Kapoor", "Freelance Consultant", 5],
-              ["No more chaos. Everything from Amazon to utility bills—auto-sorted & insightful.", "Mark Thomas", "Remote Executive", 4],
+              [
+                "The way RASEED breaks down insights is perfect for students managing budgets.",
+                "Ayesha Khan",
+                "Finance Student",
+                5,
+              ],
+              [
+                "Helped me track 50+ client payments this quarter. The follow-up reminders saved me from chasing emails all week!",
+                "Neha Kapoor",
+                "Freelance Consultant",
+                5,
+              ],
+              [
+                "No more chaos. Everything from Amazon to utility bills—auto-sorted & insightful.",
+                "Mark Thomas",
+                "Remote Executive",
+                4,
+              ],
             ].map(([text, name, role, rating], i) => (
-              <div key={i} className="bg-white p-6 rounded-lg shadow-lg text-center max-w-xs">
+              <div
+                key={i}
+                className="bg-white p-6 rounded-lg shadow-lg text-center max-w-xs"
+              >
                 <StarRating rating={rating} />
                 <p className="text-gray-600 italic mb-4">"{text}"</p>
                 <h4 className="font-bold">{name}</h4>
@@ -208,7 +298,9 @@ const AboutPage = () => {
               </div>
             ))}
           </div>
-          <button className="text-3xl text-gray-400 hover:text-gray-600"><FaChevronRight /></button>
+          <button className="text-3xl text-gray-400 hover:text-gray-600">
+            <FaChevronRight />
+          </button>
         </div>
       </section>
 

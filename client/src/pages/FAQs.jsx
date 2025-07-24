@@ -1,25 +1,29 @@
-import React, { useState } from 'react';
-import { BsChevronDown } from 'react-icons/bs';
+import React, { useState } from "react";
+import { BsChevronDown } from "react-icons/bs";
 
 const faqData = [
   {
     question: "What is your refund policy?",
-    answer: "Our refund policy allows for returns within 30 days of purchase. Please visit our returns page for detailed instructions and to initiate a refund request.",
+    answer:
+      "Our refund policy allows for returns within 30 days of purchase. Please visit our returns page for detailed instructions and to initiate a refund request.",
     color: "bg-red-500",
   },
   {
     question: "How do I cancel my subscription?",
-    answer: "You can cancel your subscription at any time through your account settings. Once canceled, you will retain access until the end of your current billing period.",
+    answer:
+      "You can cancel your subscription at any time through your account settings. Once canceled, you will retain access until the end of your current billing period.",
     color: "bg-blue-500",
   },
   {
     question: "Is there a discount for annual billing?",
-    answer: "Yes, we offer a significant discount for users who choose annual billing. You can save up to 20% compared to paying monthly.",
+    answer:
+      "Yes, we offer a significant discount for users who choose annual billing. You can save up to 20% compared to paying monthly.",
     color: "bg-yellow-400",
   },
   {
     question: "How can I contact support?",
-    answer: "Our support team is available 24/7. You can reach us via email at support@raseed.com, or through the live chat feature on our website.",
+    answer:
+      "Our support team is available 24/7. You can reach us via email at support@raseed.com, or through the live chat feature on our website.",
     color: "bg-green-500",
   },
 ];
@@ -32,18 +36,20 @@ const FAQItem = ({ question, answer, color, isOpen, onToggle }) => (
       aria-expanded={isOpen}
     >
       <div className="flex items-start space-x-4">
-        <div className={`w-4 h-4 rounded-full mt-1 flex-shrink-0 ${color}`}></div>
+        <div
+          className={`w-4 h-4 rounded-full mt-1 flex-shrink-0 ${color}`}
+        ></div>
         <h3 className="font-bold text-gray-800 text-lg">{question}</h3>
       </div>
       <BsChevronDown
         className={`w-5 h-5 text-gray-500 transform transition-transform duration-300 flex-shrink-0 ${
-          isOpen ? 'rotate-180' : 'rotate-0'
+          isOpen ? "rotate-180" : "rotate-0"
         }`}
       />
     </button>
     <div
       className={`overflow-hidden transition-all duration-300 ease-in-out ${
-        isOpen ? 'max-h-60' : 'max-h-0'
+        isOpen ? "max-h-60" : "max-h-0"
       }`}
     >
       <p className="text-gray-600 px-6 pb-6 pl-14">{answer}</p>
