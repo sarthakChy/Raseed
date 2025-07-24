@@ -7,7 +7,7 @@ from datetime import datetime
 from enum import Enum
 from dataclasses import dataclass, asdict
 import uuid
-
+from pydantic import BaseModel, Field
 from google.cloud import aiplatform
 from vertexai.generative_models import GenerativeModel, Tool, FunctionDeclaration
 import vertexai
@@ -93,6 +93,34 @@ class WorkflowResult:
     final_response: str = ""
     execution_time: float = 0.0
     error_summary: str = ""
+
+class StepResultResponse(BaseModel):
+    step_id: str
+    agent_name: str
+    success: bool
+    result: Optional[Any] = None
+    error: str = ""
+    execution_time: float = 0.0
+    retry_attempt: int = 0
+
+class OrchestratorResponse(BaseModel):
+    success: bool
+    workflow_id: Optional[str] = None
+    intent: Optional[str] = None
+    status: Optional[str] = None
+    response: str = ""
+    execution_time: float = 0.0
+    step_results: Dict[str, Dict[str, Any]] = {}
+    error_summary: str = ""
+    error: Optional[str] = None
+    query: Optional[str] = None
+
+    class Config:
+        arbitrary_types_allowed = True
+        json_encoders = {
+            uuid.UUID: lambda u: str(u)
+        }
+
 
 
 class MasterOrchestrator:
@@ -517,7 +545,7 @@ If the query doesn't clearly fit any category, respond with UNKNOWN.
         query: str,
         user_id: Optional[str] = None,
         additional_context: Optional[Dict] = None
-    ) -> Dict[str, Any]:
+    ) -> OrchestratorResponse:
         """
         Process a user query through the complete orchestration pipeline.
         
@@ -530,33 +558,23 @@ If the query doesn't clearly fit any category, respond with UNKNOWN.
             Complete response with results and metadata
         """
         try:
-            # # Get user context
-            # user_context = {}
-            # if user_id:
-            #     user_profile = await self.user_profile_manager.get_personalization_context(user_id)
-            #     user_context.update(user_profile)
-            
-            # if additional_context:
-            #     user_context.update(additional_context)
-            
             # Classify intent
             intent = await self.classify_intent(query)
             self.logger.info(f"Classified intent: {intent.value} for query: {query[:50]}...")
             
             # Check if we have a workflow for this intent
             if intent not in self.workflow_definitions:
-                return {
-                    "success": False,
-                    "error": f"No workflow defined for intent: {intent.value}",
-                    "intent": intent.value
-                }
+                return OrchestratorResponse(
+                    success=False,
+                    error=f"No workflow defined for intent: {intent.value}",
+                    intent=intent.value
+                )
             
             # Prepare workflow context
             workflow_context = {
                 "original_query": query,
                 "user_id": user_id,
                 "intent": intent.value,
-                # "user_context": user_context,
                 "timestamp": datetime.now().isoformat()
             }
             
@@ -565,24 +583,24 @@ If the query doesn't clearly fit any category, respond with UNKNOWN.
             result = await self.execute_workflow(workflow, workflow_context)
             
             # Return comprehensive response
-            return {
-                "success": result.status in [WorkflowStatus.COMPLETED, WorkflowStatus.PARTIAL_SUCCESS],
-                "workflow_id": result.workflow_id,
-                "intent": intent.value,
-                "status": result.status.value,
-                "response": result.final_response,
-                "execution_time": result.execution_time,
-                "step_results": {k: asdict(v) for k, v in result.results.items()},
-                "error_summary": result.error_summary
-            }
+            return OrchestratorResponse(
+                success=result.status in [WorkflowStatus.COMPLETED, WorkflowStatus.PARTIAL_SUCCESS],
+                workflow_id=result.workflow_id,
+                intent=intent.value,
+                status=result.status.value,
+                response=result.final_response,
+                execution_time=result.execution_time,
+                step_results={k: asdict(v) for k, v in result.results.items()},
+                error_summary=result.error_summary
+            )
             
         except Exception as e:
             self.logger.error(f"Query processing failed: {e}")
-            return {
-                "success": False,
-                "error": str(e),
-                "query": query
-            }
+            return OrchestratorResponse(
+                success=False,
+                error=str(e),
+                query=query
+            )
     
     def get_system_status(self) -> Dict[str, Any]:
         """Get current system status and metrics."""
