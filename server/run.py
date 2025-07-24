@@ -217,7 +217,7 @@ async def chat_handler(
 
         # response = chat.send_message(user_message)
 
-        return JSONResponse(content={"reply": result.text})
+        return JSONResponse(content=json.loads(result.model_dump_json()))
 
     except Exception as e:
         logging.error(f"Chat endpoint error: {e}")

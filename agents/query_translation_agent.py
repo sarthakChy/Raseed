@@ -6,6 +6,7 @@ from typing import Dict, List, Any, Optional, Union, Tuple
 from datetime import datetime, timedelta
 from dataclasses import dataclass
 from enum import Enum
+import uuid
 
 from pydantic import BaseModel, Field, validator
 from vertexai.generative_models import FunctionDeclaration, GenerationConfig
@@ -97,6 +98,9 @@ class StructuredQuery(BaseModel):
     confidence_score: float = Field(..., ge=0.0, le=1.0, description="Overall parsing confidence")
     requires_clarification: bool = Field(default=False, description="Whether query needs clarification")
     clarification_questions: List[str] = Field(default_factory=list, description="Questions for clarification")
+    class Config:
+        arbitrary_types_allowed = True
+        json_encoders = {uuid.UUID: lambda u: str(u)}
 
     @validator('confidence_score')
     def validate_confidence(cls, v):
@@ -146,14 +150,25 @@ class QueryTranslationResult(BaseModel):
     validation: Optional[ValidationResult] = Field(None, description="Validation results")
     processing_metadata: Dict[str, Any] = Field(default_factory=dict, description="Processing metadata")
     error: Optional[str] = Field(None, description="Error message if translation failed")
+    analysis_type: Optional[str] = Field(None, description="Type of analysis to perform")
 
+    class Config:
+        arbitrary_types_allowed = True
+        json_encoders = {
+            uuid.UUID: lambda u: str(u)
+        }
+
+    
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for JSON serialization."""
-        return self.dict()
-
-    def to_json(self) -> str:
-        """Convert to JSON string."""
-        return self.json()
+        """Convert to dictionary for workflow consumption."""
+        result_dict = self.model_dump()
+        
+        # Ensure structured_query is properly serialized
+        if self.structured_query:
+            result_dict['structured_query'] = self.structured_query.dict()
+            result_dict['analysis_type'] = self.structured_query.query_type.value
+        
+        return result_dict
 
 
 class QueryTranslationAgent(BaseAgent):
@@ -309,6 +324,7 @@ class QueryTranslationAgent(BaseAgent):
             result = QueryTranslationResult(
                 success=True,
                 structured_query=structured_query,
+                analysis_type=structured_query.query_type.value,
                 decomposition=decomposition,
                 validation=validation,
                 processing_metadata={

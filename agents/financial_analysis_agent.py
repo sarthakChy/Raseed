@@ -4,7 +4,8 @@ import os
 from typing import Dict, List, Any, Optional, Union, Tuple
 from datetime import datetime, timedelta
 import json
-
+import time
+import uuid
 from vertexai.generative_models import FunctionDeclaration, Tool
 
 from agents.base_agent import BaseAgent
@@ -532,11 +533,16 @@ class FinancialAnalysisAgent(BaseAgent):
         Main processing entry point for financial analysis queries.
         Expects a structured_query and user_id in the request.
         """
+        start_time = time.time()
         try:
             self.logger.info("Processing financial analysis request")
 
             structured_query = request.get("structured_query")
             user_id = request.get("user_id")
+            analysis_type = request.get("analysis_type")
+
+            if analysis_type:
+                self.logger.info(f"Processing {analysis_type} analysis")
 
             if structured_query is None or user_id is None:
                 raise ValueError("Missing required input: structured_query and user_id must be provided")
@@ -609,7 +615,11 @@ class FinancialAnalysisAgent(BaseAgent):
 
             return {
                 "success": True,
-                "analysis": result
+                "results": result,  # ✅ Change from "analysis" to "results"
+                "metadata": {
+                    "query_type": structured_query.get("query_type"),
+                    "execution_time": time.time() - start_time,
+                }
             }
 
         except Exception as e:
