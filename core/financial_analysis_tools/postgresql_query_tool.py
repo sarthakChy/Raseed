@@ -365,7 +365,7 @@ class PostgreSQLQueryTool:
     
     def _build_filters(self, filters: Dict[str, Any], initial_param_idx: int) -> Tuple[str, List[Any], int]:
         """Build SQL filter clauses and parameters from filter dictionary.
-           Returns (filter_clause_string, parameters_list, next_param_index)."""
+        Returns (filter_clause_string, parameters_list, next_param_index)."""
         all_filter_parts = []
         params = []
         param_count = initial_param_idx # Start parameter indexing from here
@@ -415,6 +415,7 @@ class PostgreSQLQueryTool:
                 param_count += 1
         
         filter_clause_string = " AND " + " AND ".join(all_filter_parts) if all_filter_parts else ""
+        # FIXED: Return the tuple correctly - the current code returns 3 values, but some callers expect only 2
         return filter_clause_string, params, param_count
     
     async def execute_query(
@@ -549,7 +550,7 @@ class PostgreSQLQueryTool:
     ) -> Dict[str, Any]:
         """Execute category aggregations query."""
         filters = filters or {}
-        filter_clause, filter_params = self._build_filters(filters, initial_param_idx=2)
+        filter_clause, filter_params, _ = self._build_filters(filters, initial_param_idx=2)
         
         query = self.query_templates['category_aggregations'].format(
             time_period=time_period,
@@ -578,7 +579,7 @@ class PostgreSQLQueryTool:
     ) -> Dict[str, Any]:
         """Execute time series trends analysis."""
         filters = filters or {}
-        filter_clause, filter_params = self._build_filters(filters, initial_param_idx=2)
+        filter_clause, filter_params, _ = self._build_filters(filters, initial_param_idx=2)
         
         query = self.query_templates['time_series_trends'].format(
             date_filter=filter_clause.replace('AND t.transaction_date', 'AND t.transaction_date') if 'date_range' in str(filter_clause) else '',
@@ -595,7 +596,7 @@ class PostgreSQLQueryTool:
                 "data": [dict(row) for row in rows],
                 "query_type": "trends"
             }
-    
+
     async def _execute_comparisons_query(
         self,
         user_id: str,
@@ -605,7 +606,7 @@ class PostgreSQLQueryTool:
     ) -> Dict[str, Any]:
         """Execute merchant or category comparison analysis."""
         filters = filters or {}
-        filter_clause, filter_params = self._build_filters(filters, initial_param_idx=2)
+        filter_clause, filter_params, _ = self._build_filters(filters, initial_param_idx=2)
         
         if comparison_type == "merchant":
             query = self.query_templates['merchant_analysis'].format(
@@ -630,7 +631,7 @@ class PostgreSQLQueryTool:
                 "comparison_type": comparison_type,
                 "query_type": "comparisons"
             }
-    
+
     async def _execute_patterns_query(
         self,
         user_id: str,
@@ -639,7 +640,7 @@ class PostgreSQLQueryTool:
     ) -> Dict[str, Any]:
         """Execute spending patterns analysis."""
         filters = filters or {}
-        filter_clause, filter_params = self._build_filters(filters, initial_param_idx=2)
+        filter_clause, filter_params, _ = self._build_filters(filters, initial_param_idx=2)
         
         query = self.query_templates['spending_patterns'].format(
             date_filter=filter_clause.replace('AND t.transaction_date', 'AND t.transaction_date') if 'date_range' in str(filter_clause) else ''
