@@ -177,59 +177,33 @@ class RecommendationEngineAgent(BaseAgent):
 
             # --- 4. Cost-Benefit Analysis Tool ---
         cost_benefit_analysis_tool = FunctionDeclaration(
-                name="perform_cost_benefit_analysis",
-                # Corrected Description: Focus on calculation and analysis, not "assessing impact of adopting a recommendation" (that's synthesis)
-                description="Calculates the potential financial savings and costs associated with a proposed financial change or action. Provides quantitative metrics like net savings, payback period, and lists qualitative trade-offs.",
-                parameters={
-                    "type": "object",
-                    "properties": {
-                        "user_id": {
-                            "type": "string",
-                            "description": "The unique identifier for the user for whom the analysis is being performed."
+                    name = "cost_benefit_analysis",
+                    description = "Quantifies financial impact of cost-saving recommendations using structured analysis",
+                    parameters = {
+                        "type": "object",
+                        "properties": {
+                            "user_id": {
+                                "type": "string",
+                                "description": "User identifier for personalized analysis"
+                            },
+                            "spending_analysis": {
+                                "type": "object",
+                                "description": "Financial analysis results from previous workflow step containing spending patterns and category breakdowns"
+                            },
+                            "user_goals": {
+                                "type": "object",
+                                "description": "User's financial goals and preferences for recommendation targeting",
+                                "optional": True
+                            },
+                            "original_query": {
+                                "type": "string", 
+                                "description": "Original user query for context-aware recommendations",
+                                "optional": True
+                            }
                         },
-                        "recommendation_summary": {
-                            "type": "string",
-                            "description": "A brief description of the recommendation or change being analyzed (e.g., 'cancel streaming service', 'switch to generic brands')."
-                        },
-                        "current_cost_per_period": {
-                            "type": "number",
-                            "format": "float",
-                            "description": "The current cost associated with the item/behavior being analyzed (e.g., 15.99 for a subscription, 500 for monthly dining out)."
-                        },
-                        "estimated_new_cost_per_period": {
-                            "type": "number",
-                            "format": "float",
-                            "description": "The estimated cost after adopting the recommendation (e.g., 0 after cancellation, 300 after reducing dining out).",
-                            "nullable": True
-                        },
-                        "initial_investment_required": {
-                            "type": "number",
-                            "format": "float",
-                            "description": "Any one-time upfront cost required to adopt the recommendation (e.g., buying new equipment). Defaults to 0.",
-                            "default": 0.0
-                        },
-                        "period_unit": {
-                            "type": "string",
-                            "description": "The unit of the period for costs/savings (e.g., 'month', 'year', 'week').",
-                            "enum": ["day", "week", "month", "quarter", "year"],
-                            "default": "month"
-                        },
-                        "analysis_duration_periods": {
-                            "type": "integer",
-                            "description": "The number of periods over which to perform the analysis (e.g., 12 for 12 months). Defaults to 12.",
-                            "default": 12,
-                            "minimum": 1
-                        },
-                        "qualitative_trade_offs": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                            "description": "Optional: Key qualitative factors or trade-offs to consider (e.g., 'loss of convenience', 'improved health').",
-                            "default": []
-                        }
-                    },
-                    "required": ["user_id", "recommendation_summary", "current_cost_per_period"]
-                }
-            )
+                        "required": ["user_id", "spending_analysis"]
+                    }
+        )
 
             # --- 5. Goal Alignment Tool ---
         goal_alignment_tool = FunctionDeclaration(
@@ -273,9 +247,8 @@ class RecommendationEngineAgent(BaseAgent):
         self.register_tool(behavioral_analysis_tool, self._execute_analyze_behavioral_spending_patterns)
         self.register_tool(alternative_discovery_tool, self._execute_discover_cheaper_alternatives)
         self.register_tool(budget_optimization_tool, self._execute_optimize_budget_allocation)
+        self.register_tool(cost_benefit_analysis_tool, self._execute_cost_benefit_analysis)
 
-        # maybe later
-        #self.register_tool(cost_benefit_analysis_tool, self._execute_perform_cost_benefit_analysis)
         #self.register_tool(goal_alignment_tool, self._execute_align_recommendation_to_financial_goals)
 
     async def _execute_analyze_behavioral_spending_patterns(
@@ -550,6 +523,165 @@ class RecommendationEngineAgent(BaseAgent):
                     "message": f"An unexpected error occurred: {str(e)}"
                 }
 
+    async def _execute_cost_benefit_analysis(
+        self, 
+        user_id: str, 
+        spending_analysis: Dict[str, Any],
+        user_goals: Optional[Dict[str, Any]] = None,
+        original_query: str = "") -> Dict[str, Any]:
+        """
+        Executes cost-benefit analysis within the generate_recommendations step.
+        Processes spending analysis data to generate financially quantified recommendations.
+        """
+        print(f"Executing cost-benefit analysis for recommendations - user: {user_id}")
+
+        try:
+            # Extract transaction data from financial_analysis_agent output
+            transaction_data = spending_analysis.get('data', [])
+            
+            # Aggregate transactions by category
+            category_totals = {}
+            total_spending = 0
+            
+            for transaction in transaction_data:
+                category = transaction.get('category', 'uncategorized')
+                amount = float(transaction.get('amount', 0))
+                
+                if category in category_totals:
+                    category_totals[category]['total'] += amount
+                    category_totals[category]['count'] += 1
+                    category_totals[category]['transactions'].append(transaction)
+                else:
+                    category_totals[category] = {
+                        'total': amount,
+                        'count': 1,
+                        'transactions': [transaction]
+                    }
+                total_spending += amount
+            
+            # Convert to list and identify high-spend categories
+            categories = [
+                {
+                    'name': cat, 
+                    'amount': data['total'],
+                    'transaction_count': data['count'],
+                    'avg_transaction': data['total'] / data['count'],
+                    'transactions': data['transactions']
+                } 
+                for cat, data in category_totals.items()
+            ]
+            
+            # Identify potential cost-saving opportunities (>15% of total spending)
+            high_spend_categories = [cat for cat in categories 
+                                if cat.get('amount', 0) > total_spending * 0.10]
+            
+            # Generate cost-benefit scenarios for each opportunity
+            cost_benefit_scenarios = []
+            
+            for category in high_spend_categories:
+                category_name = category.get('name', 'Unknown')
+                current_monthly_spend = category.get('amount', 0)
+                transaction_count = category.get('transaction_count', 0)
+                avg_transaction = category.get('avg_transaction', 0)
+                
+                # Generate optimization scenarios based on spending patterns
+                scenarios = self._generate_optimization_scenarios(
+                    category_name, 
+                    current_monthly_spend, 
+                    transaction_count,
+                    avg_transaction
+                )
+                
+                for scenario in scenarios:
+                    scenario_data = {
+                        "analysis_target": scenario['description'],
+                        "current_cost_per_period": current_monthly_spend,
+                        "estimated_new_cost_per_period": scenario['projected_cost'],
+                        "initial_investment_required": scenario.get('setup_cost', 0),
+                        "analysis_duration_months": 12,
+                        "cost_period_type": "monthly",
+                        "qualitative_factors": scenario.get('benefits', [])
+                    }
+                    
+                    cost_benefit_scenarios.append(scenario_data)
+
+            # Process each scenario through cost-benefit analysis
+            analyzed_recommendations = []
+            
+            for scenario in cost_benefit_scenarios:
+                prompt = f"""
+                Process this cost-saving scenario for financial quantification:
+                
+                Raw Input Data:
+                ```json
+                {json.dumps(scenario, indent=2)}
+                ```
+                
+                User Context:
+                - User ID: {user_id}
+                - Original Query: {original_query}
+                - Financial Goals: {user_goals or 'Not specified'}
+                
+                Apply cost-benefit analysis processing to generate structured recommendation data.
+                """
+
+                # Use cost-benefit synthesis model
+                synthesis_model = GenerativeModel(
+                    self.model_name,
+                    system_instruction=self.cost_benefit_synthesis_instruction
+                )
+                
+                response = await synthesis_model.generate_content_async(
+                    prompt,
+                    generation_config={"response_mime_type": "application/json"}
+                )
+                
+                cost_benefit_result = json.loads(response.text)
+                
+                # Enhance with recommendation metadata
+                recommendation = {
+                    "id": f"rec_{user_id}_{len(analyzed_recommendations)}",
+                    "type": "cost_optimization",
+                    "priority": self._calculate_priority(cost_benefit_result),
+                    "cost_benefit_analysis": cost_benefit_result,
+                    "financial_impact": cost_benefit_result.get('financial_metrics', {}),
+                    "implementation_complexity": scenario.get('complexity', 'medium'),
+                    "category": scenario.get('category', 'general')
+                }
+                
+                analyzed_recommendations.append(recommendation)
+
+            # Sort recommendations by financial impact
+            sorted_recommendations = sorted(
+                analyzed_recommendations,
+                key=lambda x: x['financial_impact'].get('net_financial_impact_over_duration', 0),
+                reverse=True
+            )
+
+            return {
+                "recommendations": sorted_recommendations[:7],  # Top 5 recommendations
+                "total_scenarios_analyzed": len(cost_benefit_scenarios),
+                "aggregate_potential_savings": sum(
+                    rec['financial_impact'].get('net_financial_impact_over_duration', 0)
+                    for rec in sorted_recommendations
+                ),
+                "analysis_metadata": {
+                    "user_id": user_id,
+                    "based_on_spending_analysis": True,
+                    "scenarios_generated": len(cost_benefit_scenarios),
+                    "high_impact_recommendations": len([r for r in sorted_recommendations 
+                                                    if r['financial_impact'].get('net_financial_impact_over_duration', 0) > 500])
+                }
+            }
+
+        except json.JSONDecodeError as e:
+            logging.error(f"JSON parsing error in cost-benefit recommendations for user {user_id}: {e}")
+            return self._return_error_response(user_id, "Failed to parse cost-benefit analysis")
+
+        except Exception as e:
+            logging.error(f"Error in cost-benefit recommendations: {traceback.format_exc()}")
+            return self._return_error_response(user_id, f"Cost-benefit analysis failed: {str(e)}")
+
 
     async def process(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -565,8 +697,8 @@ class RecommendationEngineAgent(BaseAgent):
             Dictionary with processing results, including the synthesized recommendation.
         """
         user_id = request.get("user_id")
-        prompt_text = request.get("prompt")
-        context_data = request.get("context", {}) # Additional data the model might need for tool parameters
+        prompt_text = request.get("query")
+        context_data = request.get("spending_analysis", {}) # Additional data the model might need for tool parameters
 
         if user_id:
             context_data['user_id'] = user_id
@@ -583,11 +715,11 @@ class RecommendationEngineAgent(BaseAgent):
 
             input_content = [
                 {"role": "user", 
-                "parts": [{"text": prompt_text,}]
+                "parts": [{"original_query": prompt_text,}]
                 }
             ]
             if context_data:
-                input_content[0]["parts"].append({"text": f"\n\nAdditional context for analysis:\n```json\n{json.dumps(context_data, indent=2)}\n```"})
+                input_content[0]["parts"].append({"spending_analysis":context_data})
 
             initial_response = await self.model.generate_content_async(input_content)
 
@@ -631,3 +763,154 @@ class RecommendationEngineAgent(BaseAgent):
                 user_id=user_id
             )
             return {"status": "error", "message": "An internal error occurred while processing your request."}
+
+
+
+    #helper cost_benefit and budget
+    def _generate_optimization_scenarios(self, category: str, current_spend: float, transaction_count: int, avg_transaction: float) -> List[Dict]:
+        """Generate potential cost-saving scenarios based on spending category and transaction patterns"""
+        scenarios = []
+        
+        category_lower = category.lower()
+        
+        if 'food' in category_lower or 'dining' in category_lower:
+            scenarios.extend([
+                {
+                    "description": f"Reduce {category} spending through meal planning and home cooking",
+                    "projected_cost": current_spend * 0.7,
+                    "setup_cost": 0,
+                    "benefits": ["healthier eating", "reduced food waste", "cooking skills"],
+                    "complexity": "low",
+                    "category": category
+                },
+                {
+                    "description": f"Switch to bulk buying and wholesale for {category}",
+                    "projected_cost": current_spend * 0.8,
+                    "setup_cost": 50,
+                    "benefits": ["cost savings", "fewer shopping trips", "bulk discounts"],
+                    "complexity": "medium",
+                    "category": category
+                }
+            ])
+        
+        elif 'shopping' in category_lower:
+            # High frequency = impulse buying opportunity
+            if transaction_count > 10:
+                scenarios.append({
+                    "description": f"Implement 24-hour waiting period for {category} purchases",
+                    "projected_cost": current_spend * 0.6,
+                    "setup_cost": 0,
+                    "benefits": ["reduced impulse buying", "more thoughtful purchases"],
+                    "complexity": "low",
+                    "category": category
+                })
+            
+            # High average transaction = look for alternatives  
+            if avg_transaction > 1000:
+                scenarios.append({
+                    "description": f"Research alternatives and compare prices for {category}",
+                    "projected_cost": current_spend * 0.85,
+                    "setup_cost": 0,
+                    "benefits": ["better value", "price awareness"],
+                    "complexity": "medium",
+                    "category": category
+                })
+        
+        elif 'transport' in category_lower or 'gas' in category_lower or 'fuel' in category_lower:
+            scenarios.extend([
+                {
+                    "description": f"Optimize {category} through carpooling and public transport",
+                    "projected_cost": current_spend * 0.6,
+                    "setup_cost": 0,
+                    "benefits": ["environmental impact", "reduced stress", "social connections"],
+                    "complexity": "medium",
+                    "category": category
+                },
+                {
+                    "description": f"Consolidate trips and improve route planning for {category}",
+                    "projected_cost": current_spend * 0.8,
+                    "setup_cost": 0,
+                    "benefits": ["time savings", "reduced wear and tear"],
+                    "complexity": "low",
+                    "category": category
+                }
+            ])
+        
+        elif 'subscription' in category_lower or 'entertainment' in category_lower:
+            scenarios.extend([
+                {
+                    "description": f"Audit and cancel unused {category} services",
+                    "projected_cost": current_spend * 0.5,
+                    "setup_cost": 0,
+                    "benefits": ["simplified finances", "reduced digital clutter", "focus on used services"],
+                    "complexity": "low",
+                    "category": category
+                },
+                {
+                    "description": f"Switch to family/shared plans for {category}",
+                    "projected_cost": current_spend * 0.7,
+                    "setup_cost": 0,
+                    "benefits": ["cost sharing", "family coordination"],
+                    "complexity": "medium",
+                    "category": category
+                }
+            ])
+        
+        # Generic scenarios based on transaction patterns
+        if transaction_count > 10:  # High frequency spending
+            scenarios.append({
+                "description": f"Set monthly budget limit for {category} spending",
+                "projected_cost": current_spend * 0.8,
+                "setup_cost": 0,
+                "benefits": ["budget discipline", "spending awareness"],
+                "complexity": "low",
+                "category": category
+            })
+        
+        if avg_transaction > 500:  # High-value transactions
+            scenarios.append({
+                "description": f"Implement approval process for {category} purchases over ₹500",
+                "projected_cost": current_spend * 0.85,
+                "setup_cost": 0,
+                "benefits": ["thoughtful spending", "avoiding buyer's remorse"],
+                "complexity": "low",
+                "category": category
+            })
+        
+        # Always include a generic optimization scenario
+        scenarios.append({
+            "description": f"General optimization of {category} spending habits",
+            "projected_cost": current_spend * 0.85,
+            "setup_cost": 0,
+            "benefits": ["improved budgeting", "increased savings awareness"],
+            "complexity": "low",
+            "category": category
+        })
+        
+        return scenarios
+
+    def _calculate_priority(self, cost_benefit_result: Dict) -> str:
+        """Calculate recommendation priority based on cost-benefit metrics"""
+        financial_metrics = cost_benefit_result.get('financial_metrics', {})
+        net_impact = financial_metrics.get('net_financial_impact_over_duration', 0)
+        payback_months = financial_metrics.get('payback_period_months', float('inf'))
+        
+        if net_impact > 1000 and payback_months < 6:
+            return "high"
+        elif net_impact > 500 and payback_months < 12:
+            return "medium"
+        else:
+            return "low"
+
+    def _return_error_response(self, user_id: str, message: str) -> Dict:
+        """Return standardized error response for recommendations"""
+        return {
+            "recommendations": [],
+            "total_scenarios_analyzed": 0,
+            "aggregate_potential_savings": 0,
+            "analysis_metadata": {
+                "user_id": user_id,
+                "error": True,
+                "error_message": message
+            }
+        }
