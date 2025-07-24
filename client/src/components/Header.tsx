@@ -1,0 +1,89 @@
+
+// import React from 'react';
+// const NavLink: React.FC<{ href: string; children: React.ReactNode }> = ({ href, children }) => (
+//   <a href={href} className="text-gray-700 hover:text-black transition-colors duration-300 text-base font-medium">
+//     {children}
+//   </a>
+// );
+
+// const Header: React.FC = () => {
+//   return (
+//     <header className="py-6">
+//       <nav className="flex justify-between items-center">
+//         <div className="text-2xl font-extrabold tracking-tight">
+//            <div className="flex items-center space-x-2">
+//           <div className="w-8 h-8 grid grid-cols-2 grid-rows-2 gap-0.5">
+//             <div className="bg-red-500 rounded-tl-lg"></div>
+//             <div className="bg-yellow-500 rounded-tr-lg"></div>
+//             <div className="bg-green-500 rounded-bl-lg"></div>
+//             <div className="bg-blue-500 rounded-br-lg"></div>
+//           </div>
+//           <span className="text-2xl font-bold text-gray-800">RASEED</span>
+//         </div>
+//         </div>
+        
+       
+
+
+//         <div className="hidden md:flex items-center space-x-8">
+//           <NavLink href="/">Home</NavLink>
+//           <NavLink href="/About">About</NavLink>
+//           <NavLink href="GetStarted">Get Started</NavLink>
+//           <NavLink href="/Upgrade">Upgrade Plan</NavLink>
+//           <NavLink href="/faq">FAQs</NavLink>
+//           <NavLink href="/Contact">Contact</NavLink>
+//         </div>
+//         {/* A simple placeholder for mobile menu icon if needed */}
+//         <div className="md:hidden">
+//           <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+//             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />
+//           </svg>
+//         </div>
+//       </nav>
+//     </header>
+//   );
+// };
+
+// export default Header;
+
+import React from 'react';
+
+const NavLink: React.FC<{ href: string; children: React.ReactNode }> = ({ href, children }) => (
+  <a href={href} className="text-gray-700 hover:text-black transition-colors duration-300 text-base font-medium">
+    {children}
+  </a>
+);
+
+const Header: React.FC = () => {
+  const logo = 'raseed-logo.png';
+  return (
+    <header className="py-6">
+      <nav className="flex justify-between items-center">
+        <div className="text-2xl font-extrabold tracking-tight">
+          <div className="flex items-center space-x-2">
+            <img src={logo} alt="Raseed Logo" className="w-20 h-16 object-contain" />
+            {/* <span className="text-2xl font-bold text-gray-800">RASEED</span> */}
+          </div>
+        </div>
+
+        <div className="hidden md:flex items-center space-x-8">
+          <NavLink href="/">Home</NavLink>
+          <NavLink href="/About">About</NavLink>
+          <NavLink href="/GetStarted">Get Started</NavLink>
+          <NavLink href="/Upgrade">Upgrade Plan</NavLink>
+          <NavLink href="/faq">FAQs</NavLink>
+          <NavLink href="/Contact">Contact</NavLink>
+        </div>
+
+        <div className="md:hidden">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />
+          </svg>
+        </div>
+      </nav>
+    </header>
+  );
+};
+
+export default Header;
+

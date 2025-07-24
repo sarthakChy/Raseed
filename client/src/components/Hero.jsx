@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import HeroIllustration from './HeroIllustration';
 import { useNavigate } from 'react-router-dom';
 
@@ -24,9 +25,29 @@ const Hero = () => {
           </p>
           <div className="flex flex-col sm:flex-row justify-center md:justify-start space-y-4 sm:space-y-0 sm:space-x-4 pt-4">
             <button
+<<<<<<< HEAD
 
               onClick={() => navigate('/getstarted')}
               className="bg-[#EF4444] text-white font-semibold py-3 px-8 rounded-lg shadow-lg hover:bg-red-600 transition-all duration-300 transform hover:scale-105"
+=======
+<<<<<<< HEAD
+<<<<<<< HEAD
+              onClick={() => navigate('/getstarted')}
+              className="bg-[#EF4444] text-white font-semibold py-3 px-8 rounded-lg shadow-lg hover:bg-red-600 transition-all duration-300 transform hover:scale-105"
+=======
+              className="bg-[#EF4444] text-white font-semibold py-3 px-8 rounded-lg shadow-lg hover:bg-red-600 transition-all duration-300 transform hover:scale-105"
+              onClick={() => navigate('/GetStarted')}
+>>>>>>> 1cd74f5 (TSX -> JSX + Auth-Setup)
+=======
+<<<<<<< HEAD:client/src/components/Hero.jsx
+              className="bg-[#EF4444] text-white font-semibold py-3 px-8 rounded-lg shadow-lg hover:bg-red-600 transition-all duration-300 transform hover:scale-105"
+              onClick={() => navigate('/GetStarted')}
+=======
+              onClick={() => navigate('/getstarted')}
+              className="bg-[#EF4444] text-white font-semibold py-3 px-8 rounded-lg shadow-lg hover:bg-red-600 transition-all duration-300 transform hover:scale-105"
+>>>>>>> fb50a81 ( change in about and home):client/src/components/Hero.tsx
+>>>>>>> c222fd6 ( change in about and home)
+>>>>>>> 00a20c1 (I have no idea what is this at this point)
             >
               Get Started
             </button>
