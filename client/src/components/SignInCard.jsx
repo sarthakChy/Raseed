@@ -24,6 +24,20 @@ export default function SignInCard() {
     mutate(formData);
   }
 
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+  async function handleGoogle() {
+    try {
+      await signInWithGoogle();
+      navigate('/getstarted'); 
+    } catch (err) {
+      console.error("Google sign-in failed:", err);
+    }
+  }
+
+
+>>>>>>> 9f4e6ef (I have no idea what is this at this point)
   return (
       <div className="w-full max-w-sm bg-white p-6 sm:p-5 rounded-xl shadow-md">
         <div className="text-center">
@@ -35,6 +49,19 @@ export default function SignInCard() {
           </h2>
         </div>
 
+=======
+  return (
+      <div className="w-full max-w-sm bg-white p-6 sm:p-5 rounded-xl shadow-md">
+        <div className="text-center">
+          <button onClick={() => navigate("/")}>
+            <img src="/raseed-logo.png" alt="Logo" className="h-16 mx-auto" />
+          </button>
+          <h2 className="mt-3 text-xl font-bold text-gray-900">
+            Sign in to your account
+          </h2>
+        </div>
+
+>>>>>>> 1cd74f5 (TSX -> JSX + Auth-Setup)
         <form onSubmit={handleSubmit} className="mt-5 space-y-4">
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-900">
@@ -117,7 +144,7 @@ export default function SignInCard() {
 
         {/* Google Auth */}
         <button
-          onClick={signInWithGoogle}
+          onClick={handleGoogle}
           className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-md border border-gray-300 bg-white text-sm font-semibold text-gray-700 hover:bg-gray-100"
         >
           <FcGoogle size={20} />
