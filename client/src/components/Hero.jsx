@@ -3,9 +3,8 @@ import HeroIllustration from "./HeroIllustration";
 import { useNavigate } from "react-router-dom";
 
 const Hero = () => {
-
-  const navigate = useNavigate();
   const [isVisible, setIsVisible] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const timer = setTimeout(() => setIsVisible(true), 100);
@@ -29,35 +28,8 @@ const Hero = () => {
           </p>
           <div className="flex flex-col sm:flex-row justify-center md:justify-start space-y-4 sm:space-y-0 sm:space-x-4 pt-4">
             <button
-<<<<<<< HEAD
-
-              onClick={() => navigate('/getstarted')}
-              className="bg-[#EF4444] text-white font-semibold py-3 px-8 rounded-lg shadow-lg hover:bg-red-600 transition-all duration-300 transform hover:scale-105"
-=======
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-              onClick={() => navigate('/getstarted')}
-              className="bg-[#EF4444] text-white font-semibold py-3 px-8 rounded-lg shadow-lg hover:bg-red-600 transition-all duration-300 transform hover:scale-105"
-=======
-              className="bg-[#EF4444] text-white font-semibold py-3 px-8 rounded-lg shadow-lg hover:bg-red-600 transition-all duration-300 transform hover:scale-105"
-              onClick={() => navigate('/GetStarted')}
->>>>>>> 1cd74f5 (TSX -> JSX + Auth-Setup)
-=======
-=======
->>>>>>> 76e5b20 (Frontend Integration - Back Buttons and Formatting)
-<<<<<<< HEAD:client/src/components/Hero.jsx
-              className="bg-[#EF4444] text-white font-semibold py-3 px-8 rounded-lg shadow-lg hover:bg-red-600 transition-all duration-300 transform hover:scale-105"
-              onClick={() => navigate('/GetStarted')}
-=======
-              onClick={() => navigate('/getstarted')}
-=======
               onClick={() => navigate("/getstarted")}
->>>>>>> 99181c6 (Frontend Integration - Back Buttons and Formatting)
               className="bg-[#EF4444] text-white font-semibold py-3 px-8 rounded-lg shadow-lg hover:bg-red-600 transition-all duration-300 transform hover:scale-105"
->>>>>>> fb50a81 ( change in about and home):client/src/components/Hero.tsx
->>>>>>> c222fd6 ( change in about and home)
->>>>>>> 00a20c1 (I have no idea what is this at this point)
             >
               Get Started
             </button>

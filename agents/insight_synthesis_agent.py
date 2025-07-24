@@ -7,7 +7,7 @@ from typing import Dict, Any
 
 
 class InsightSynthesisAgent(BaseAgent):
-    def __init__(self, project_id: str, user_id: str = None, model=None):
+    def __init__(self, project_id: str, agent_name : str ="insight_synthesis_agent",user_id: str = None, model=None, location=None):
         super().__init__(
             agent_name="insight_synthesis_agent",
             project_id=project_id,

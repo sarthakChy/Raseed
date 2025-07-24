@@ -396,12 +396,13 @@ async def chat_handler(
             model_name="gemini-2.0-flash-001"
         )
 
-        user_query = "Help me save money on shopping"
+        user_query = body['query']
+        user_id = auth.get("uid")
 
         # Provide dummy user_id and optional context
         result = await orchestrator.process_query(
             query=user_query,
-            user_id="a73ff731-9018-45ed-86ff-214e91baf702",
+            user_id=str(user_id),
             additional_context={
                 "currency": "USD",
                 "timezone": "America/New_York",
@@ -410,7 +411,8 @@ async def chat_handler(
         )
 
         print("----- Final Orchestrator Response -----")
-        print(result)
+        # print(result)
+
         # user_message = body.get("message")
         # if not user_message:
         #     raise HTTPException(status_code=400, detail="Missing 'message' in body.")
@@ -420,7 +422,16 @@ async def chat_handler(
 
         # response = chat.send_message(user_message)
 
-        return JSONResponse(content=json.loads(result.model_dump_json()))
+        # Return only synthesize_insights.result
+        full_json = json.loads(result.model_dump_json())
+        print("##################################")
+        print(full_json)
+        print("##################################")
+        synth_result = full_json.get("step_results", {}).get("synthesize_insights", {}).get("result", {})
+        print("##################################")
+        print(synth_result)
+        print("##################################")
+        return JSONResponse(content=synth_result)
 
     except Exception as e:
         logging.error(f"Chat endpoint error: {e}")
