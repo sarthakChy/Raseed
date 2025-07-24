@@ -17,20 +17,6 @@ import About from './pages/About';
 import Upgrade from './pages/Upgrade';
 import FAQs from './pages/FAQs';
 import Contact from './pages/Contact';
-<<<<<<< HEAD
-=======
-import Upgrade from './pages/Upgrade';
-import GetStarted from './pages/GetStarted';
-import Chatbot from './pages/Chatbot';
-import SignIn from './pages/SignIn';
-import SignUp from './pages/SignUp';
-import './App.css';
-import PrivateRoute from './components/PrivateRoute';
-import Dashboard from './pages/Dashboard';
-import History from "./pages/History";
-import ScanReceipts from './pages/ScanReceipts';
-import ReceiptResult from './pages/ReceiptResult';
->>>>>>> 72e950a (I have no idea what is this at this point)
 
 import './App.css';
 import GetStarted from './pages/GetStarted';
@@ -74,21 +60,11 @@ export default function App() {
                   <ScanReceipts />
                 </PrivateRoute>
               } />
-<<<<<<< HEAD
-=======
-
->>>>>>> 72e950a (I have no idea what is this at this point)
               <Route path="/receipt-result" element={
                 <PrivateRoute>
                   <ReceiptResult />
                 </PrivateRoute>
               } />
-<<<<<<< HEAD
-=======
-
-              <Route path="/signin" element={<SignIn />} />
-              <Route path="/signup" element={<SignUp />} />
->>>>>>> 72e950a (I have no idea what is this at this point)
             </Routes>
           </main>
         </div>
