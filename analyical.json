@@ -1,0 +1,370 @@
+{
+    "success": true,
+    "workflow_id": "f5d89e9a-80bf-4390-83c9-8d19e36bd0fd",
+    "intent": "analytical",
+    "status": "completed",
+    "response": "{'insights': 'I do not have any information about your grocery spending. I need access to your spending data to provide insights into your spending habits. I am unable to provide you with an analysis of your spending without this data.', 'visualization': {'type': 'bar_chart', 'fields': {'x_axis': ['Groceries'], 'y_axis': [0]}, 'caption': 'Spending on groceries last month was $0.'}, 'explanation': \"A bar chart is suitable because it can visually represent the total spending on groceries last month as a single bar, making it easy to understand the magnitude of the expense. It's effective for displaying a single aggregated value.\"}",
+    "execution_time": 21.638933,
+    "step_results": {
+        "translate_query": {
+            "step_id": "translate_query",
+            "agent_name": "query_translation_agent",
+            "success": true,
+            "result": {
+                "success": true,
+                "structured_query": {
+                    "query_type": "spending_analysis",
+                    "entities": [
+                        {
+                            "entity_type": "category",
+                            "value": "groceries",
+                            "confidence": 0.95,
+                            "original_text": "groceries",
+                            "normalized_value": "food"
+                        }
+                    ],
+                    "time_range": {
+                        "type": "last_month",
+                        "start_date": null,
+                        "end_date": null,
+                        "relative_period": null
+                    },
+                    "filters": {
+                        "categories": [
+                            "food"
+                        ],
+                        "merchants": [],
+                        "amount_min": null,
+                        "amount_max": null,
+                        "tags": [],
+                        "exclude_categories": []
+                    },
+                    "analysis_parameters": {
+                        "aggregation_level": "monthly",
+                        "comparison_baseline": null,
+                        "metrics": [
+                            "total_amount"
+                        ],
+                        "grouping": [
+                            "category"
+                        ],
+                        "sorting": null,
+                        "limit": null
+                    },
+                    "context_requirements": [
+                        "transactions"
+                    ],
+                    "original_query": "How much did I spend on groceries last month?",
+                    "confidence_score": 0.85,
+                    "requires_clarification": false,
+                    "clarification_questions": []
+                },
+                "decomposition": null,
+                "validation": {
+                    "is_valid": true,
+                    "issues": [],
+                    "suggestions": [],
+                    "required_data": [
+                        "transactions"
+                    ],
+                    "estimated_complexity": {
+                        "level": "medium",
+                        "factors": [
+                            "grouping_required"
+                        ],
+                        "estimated_execution_time": 3.0,
+                        "requires_decomposition": false
+                    }
+                },
+                "processing_metadata": {
+                    "agent": "query_translation_agent",
+                    "timestamp": "2025-07-24T19:04:04.621146",
+                    "confidence": 0.85,
+                    "complexity": "medium"
+                },
+                "error": null,
+                "analysis_type": "spending_analysis"
+            },
+            "error": "",
+            "execution_time": 3.9015,
+            "retry_attempt": 0
+        },
+        "analyze_data": {
+            "step_id": "analyze_data",
+            "agent_name": "financial_analysis_agent",
+            "success": true,
+            "result": {
+                "success": true,
+                "results": {
+                    "success": true,
+                    "data": [
+                        {
+                            "transaction_id": "c777f5bf-253f-4226-8f42-6e995f2c859f",
+                            "amount": "1058.46",
+                            "category": "food",
+                            "subcategory": null,
+                            "transaction_date": "2025-07-23",
+                            "merchant_name": "Domino's Pizza",
+                            "merchant_normalized": "Dominos",
+                            "payment_method": "CASH"
+                        },
+                        {
+                            "transaction_id": "7e09dcd4-7658-4f53-aa56-29eb90b42da6",
+                            "amount": "708.00",
+                            "category": "food",
+                            "subcategory": null,
+                            "transaction_date": "2025-07-23",
+                            "merchant_name": "Binge Cafe",
+                            "merchant_normalized": "Binge Cafe",
+                            "payment_method": "UPI"
+                        },
+                        {
+                            "transaction_id": "ab771d3f-9603-4b8d-ac01-ee87d3b64b44",
+                            "amount": "352.82",
+                            "category": "food",
+                            "subcategory": null,
+                            "transaction_date": "2025-07-23",
+                            "merchant_name": "Domino's Pizza",
+                            "merchant_normalized": "Dominos",
+                            "payment_method": "Credit Card"
+                        },
+                        {
+                            "transaction_id": "9e28298c-de24-45f7-850e-33daa8e16556",
+                            "amount": "243.08",
+                            "category": "food",
+                            "subcategory": null,
+                            "transaction_date": "2025-07-23",
+                            "merchant_name": "Domino's Pizza",
+                            "merchant_normalized": "Dominos",
+                            "payment_method": "CASH"
+                        },
+                        {
+                            "transaction_id": "fa215ce0-80ed-4d35-8228-a0d92d681e5a",
+                            "amount": "212.40",
+                            "category": "food",
+                            "subcategory": null,
+                            "transaction_date": "2025-07-23",
+                            "merchant_name": "Binge Cafe",
+                            "merchant_normalized": "Binge Cafe",
+                            "payment_method": "CASH"
+                        },
+                        {
+                            "transaction_id": "3f04f5ab-5966-4b60-a41c-d45c1fe17fd5",
+                            "amount": "802.40",
+                            "category": "food",
+                            "subcategory": null,
+                            "transaction_date": "2025-07-23",
+                            "merchant_name": "Cafe Coffee Day",
+                            "merchant_normalized": "CCD",
+                            "payment_method": "UPI"
+                        },
+                        {
+                            "transaction_id": "0e3e6403-c56d-4fed-876d-f211f08481ba",
+                            "amount": "1061.55",
+                            "category": "food",
+                            "subcategory": null,
+                            "transaction_date": "2025-07-23",
+                            "merchant_name": "Domino's Pizza",
+                            "merchant_normalized": "Dominos",
+                            "payment_method": "Wallet"
+                        },
+                        {
+                            "transaction_id": "cee7ef81-72bf-4f71-8213-7390eca80f1f",
+                            "amount": "950.00",
+                            "category": "food",
+                            "subcategory": null,
+                            "transaction_date": "2025-07-18",
+                            "merchant_name": "Satya Food Kapoor's BALLE",
+                            "merchant_normalized": "Satya Food Kapoor's BALLE",
+                            "payment_method": "Online [Swiggy]"
+                        },
+                        {
+                            "transaction_id": "25d138de-cb85-4eb4-a386-8b0fa6c754b7",
+                            "amount": "378.00",
+                            "category": "food",
+                            "subcategory": null,
+                            "transaction_date": "2025-07-01",
+                            "merchant_name": "Binge Cafe",
+                            "merchant_normalized": "Binge Cafe",
+                            "payment_method": "Credit Card"
+                        },
+                        {
+                            "transaction_id": "e82742ba-ec0d-46bc-b07d-d906d278d9b0",
+                            "amount": "1905.75",
+                            "category": "food",
+                            "subcategory": null,
+                            "transaction_date": "2025-06-08",
+                            "merchant_name": "Domino's Pizza",
+                            "merchant_normalized": "Dominos",
+                            "payment_method": "Debit Card"
+                        },
+                        {
+                            "transaction_id": "6c55be15-7465-481d-8b64-4f8ff5c43559",
+                            "amount": "1125.72",
+                            "category": "food",
+                            "subcategory": null,
+                            "transaction_date": "2025-04-13",
+                            "merchant_name": "Domino's Pizza",
+                            "merchant_normalized": "Dominos",
+                            "payment_method": "Wallet"
+                        },
+                        {
+                            "transaction_id": "c5912d8c-9d0f-4964-8a0d-926acd5ef6ed",
+                            "amount": "1170.40",
+                            "category": "food",
+                            "subcategory": null,
+                            "transaction_date": "2025-03-29",
+                            "merchant_name": "Domino's Pizza",
+                            "merchant_normalized": "Dominos",
+                            "payment_method": "Cash"
+                        },
+                        {
+                            "transaction_id": "8c745304-d3b1-4da6-af7f-86ef286b7d83",
+                            "amount": "694.40",
+                            "category": "food",
+                            "subcategory": null,
+                            "transaction_date": "2025-03-15",
+                            "merchant_name": "Domino's Pizza",
+                            "merchant_normalized": "Dominos",
+                            "payment_method": "UPI"
+                        },
+                        {
+                            "transaction_id": "a19d7092-7cb8-4ce4-bf91-3e7e8ba62dce",
+                            "amount": "1449.00",
+                            "category": "food",
+                            "subcategory": null,
+                            "transaction_date": "2025-03-13",
+                            "merchant_name": "Cafe Coffee Day",
+                            "merchant_normalized": "CCD",
+                            "payment_method": "Wallet"
+                        },
+                        {
+                            "transaction_id": "7a17af6d-86ba-4022-82a1-ed9380c677d8",
+                            "amount": "1109.20",
+                            "category": "food",
+                            "subcategory": null,
+                            "transaction_date": "2025-03-05",
+                            "merchant_name": "Binge Cafe",
+                            "merchant_normalized": "Binge Cafe",
+                            "payment_method": "Debit Card"
+                        },
+                        {
+                            "transaction_id": "9382022d-1805-4009-b0b1-3b8244efaa71",
+                            "amount": "1281.00",
+                            "category": "food",
+                            "subcategory": null,
+                            "transaction_date": "2025-03-05",
+                            "merchant_name": "Binge Cafe",
+                            "merchant_normalized": "Binge Cafe",
+                            "payment_method": "Debit Card"
+                        },
+                        {
+                            "transaction_id": "e03996ef-8f63-42c8-a498-387cb2d8c61c",
+                            "amount": "851.20",
+                            "category": "food",
+                            "subcategory": null,
+                            "transaction_date": "2025-03-03",
+                            "merchant_name": "Binge Cafe",
+                            "merchant_normalized": "Binge Cafe",
+                            "payment_method": "Credit Card"
+                        },
+                        {
+                            "transaction_id": "ff25c939-900b-4f96-8056-bc5774f76aca",
+                            "amount": "660.80",
+                            "category": "food",
+                            "subcategory": null,
+                            "transaction_date": "2025-03-01",
+                            "merchant_name": "Cafe Coffee Day",
+                            "merchant_normalized": "CCD",
+                            "payment_method": "Debit Card"
+                        },
+                        {
+                            "transaction_id": "518cad7a-74c7-4a39-805e-6c1c873d099f",
+                            "amount": "716.80",
+                            "category": "food",
+                            "subcategory": null,
+                            "transaction_date": "2025-02-23",
+                            "merchant_name": "Binge Cafe",
+                            "merchant_normalized": "Binge Cafe",
+                            "payment_method": "UPI"
+                        },
+                        {
+                            "transaction_id": "fd7a1cf3-c5e6-448d-81d2-13fb0996c587",
+                            "amount": "268.80",
+                            "category": "food",
+                            "subcategory": null,
+                            "transaction_date": "2025-02-05",
+                            "merchant_name": "Cafe Coffee Day",
+                            "merchant_normalized": "CCD",
+                            "payment_method": "Credit Card"
+                        },
+                        {
+                            "transaction_id": "28dfd8f9-04d8-49be-90e9-c88b65403ffe",
+                            "amount": "627.90",
+                            "category": "food",
+                            "subcategory": null,
+                            "transaction_date": "2025-02-05",
+                            "merchant_name": "Domino's Pizza",
+                            "merchant_normalized": "Dominos",
+                            "payment_method": "Net Banking"
+                        },
+                        {
+                            "transaction_id": "50d23143-75b6-41b4-ae79-6a3f02526835",
+                            "amount": "672.00",
+                            "category": "food",
+                            "subcategory": null,
+                            "transaction_date": "2025-02-05",
+                            "merchant_name": "Binge Cafe",
+                            "merchant_normalized": "Binge Cafe",
+                            "payment_method": "UPI"
+                        }
+                    ],
+                    "count": 22,
+                    "query_type": "transactions"
+                },
+                "metadata": {
+                    "query_type": "spending_analysis",
+                    "execution_time": 0.8246927261352539
+                }
+            },
+            "error": "",
+            "execution_time": 5.902233,
+            "retry_attempt": 0
+        },
+        "synthesize_insights": {
+            "step_id": "synthesize_insights",
+            "agent_name": "insight_synthesis_agent",
+            "success": true,
+            "result": {
+                "insights": "In July 2025, you spent a total of $5326.11 on food. A significant portion of your food spending went to Domino's Pizza ($3695.72), Binge Cafe ($3386.1), and Cafe Coffee Day ($2979). It appears you frequently visit these merchants. Consider exploring other dining options for more variety!",
+                "visualization": {
+                    "type": "bar_chart",
+                    "fields": {
+                        "x_axis": [
+                            "2025-07-01",
+                            "2025-06-01",
+                            "2025-04-01",
+                            "2025-03-01",
+                            "2025-02-01"
+                        ],
+                        "y_axis": [
+                            5668.46,
+                            1905.75,
+                            1125.72,
+                            7942.6,
+                            1575.5
+                        ]
+                    },
+                    "caption": "The bar chart shows the amount spent on groceries each month."
+                },
+                "explanation": "A bar chart is suitable because it effectively compares the total spending on groceries across different months, visually highlighting the changes in expenditure over time. It clearly presents the monthly grocery expenses for easy comparison."
+            },
+            "error": "",
+            "execution_time": 8.571981,
+            "retry_attempt": 0
+        }
+    },
+    "error_summary": "",
+    "error": null,
+    "query": null
+}

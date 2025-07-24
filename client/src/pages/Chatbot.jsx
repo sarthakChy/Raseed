@@ -1,11 +1,38 @@
 import React, { useEffect, useRef, useState } from "react";
 import { IoMdAdd } from "react-icons/io";
 import { IoSend } from "react-icons/io5";
-import { Link } from "react-router-dom"; // Make sure this is at the top
+import { Link } from "react-router-dom";
 import { FiEdit2 } from "react-icons/fi";
 import { MdDashboard } from "react-icons/md";
 import { FaReceipt } from "react-icons/fa";
 import { getAuth } from "firebase/auth";
+import {
+  Bar,
+  Line,
+  Pie
+} from "react-chartjs-2";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  LineElement,
+  PointElement,
+  ArcElement,
+  Tooltip,
+  Legend
+} from "chart.js";
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  LineElement,
+  PointElement,
+  ArcElement,
+  Tooltip,
+  Legend
+);
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
@@ -20,6 +47,7 @@ const Chatbot = () => {
   const [activeChatIndex, setActiveChatIndex] = useState(0);
   const [inputText, setInputText] = useState("");
   const [isThinking, setIsThinking] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
   const inputRef = useRef(null);
   const chatEndRef = useRef(null);
 
@@ -27,15 +55,71 @@ const Chatbot = () => {
     inputRef.current?.focus();
   }, []);
 
+  const renderChart = (visualization) => {
+    const { type, fields, caption } = visualization || {};
+    if (!fields || !fields.x_axis || !fields.y_axis || !fields.x_axis.length || !fields.y_axis.length) return null;
+
+    const baseDataset = {
+      label: caption,
+      data: fields.y_axis,
+      borderColor: "#2563eb",
+      backgroundColor: "#3b82f6",
+      borderWidth: 2,
+    };
+
+    const pieColors = [
+      "#4285F4", "#EA4335", "#FBBC05", "#34A853",
+      "#A142F4", "#00ACC1", "#F4511E", "#C0CA33"
+    ];
+
+    const pieDataset = {
+      label: caption,
+      data: fields.y_axis,
+      backgroundColor: pieColors.slice(0, fields.y_axis.length),
+      borderWidth: 1,
+    };
+
+    const options = {
+      responsive: true,
+      maintainAspectRatio: type === "pie_chart" ? false : true,
+      plugins: {
+        legend: {
+          display: type === "pie_chart",
+          position: "bottom",
+        },
+      },
+    };
+
+    switch (type) {
+      case "bar_chart":
+        return (
+          <div className="h-[210px] mx-auto">
+            <Bar data={{ labels: fields.x_axis, datasets: [baseDataset] }} options={options} />
+          </div>
+        )
+      case "line_chart":
+        return (
+          <div className="h-[210px] mx-auto">
+            <Line data={{ labels: fields.x_axis, datasets: [baseDataset] }} options={options} />
+          </div>
+        )
+      case "pie_chart":
+        return (
+          <div className="h-[210px] mx-auto">
+            <Pie data={{ labels: fields.x_axis, datasets: [pieDataset] }} options={options} />
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
   const handleSendMessage = async (text) => {
     if (!text.trim()) return;
 
     const updatedChats = [...chats];
     updatedChats[activeChatIndex].messages.push({ sender: "user", text });
-    updatedChats[activeChatIndex].messages.push({
-      sender: "bot",
-      text: "RASEED is thinking…",
-    });
+    updatedChats[activeChatIndex].messages.push({ sender: "bot", text: "RASEED is thinking…" });
     setChats(updatedChats);
     setInputText("");
     setIsThinking(true);
@@ -57,10 +141,14 @@ const Chatbot = () => {
       });
 
       const data = await response.json();
-      updatedChats[activeChatIndex].messages.pop(); // remove "thinking"
+      updatedChats[activeChatIndex].messages.pop(); // remove thinking msg
+
+      const { insights, visualization, explanation } = data.reply || {};
       updatedChats[activeChatIndex].messages.push({
         sender: "bot",
-        text: data.reply || "Something went wrong.",
+        text: insights,
+        visualization,
+        explanation,
       });
     } catch (e) {
       console.error("Error sending message:", e);
@@ -72,7 +160,6 @@ const Chatbot = () => {
     } finally {
       setChats([...updatedChats]);
       setIsThinking(false);
-      // inputRef.current?.focus();
     }
   };
 
@@ -97,6 +184,13 @@ const Chatbot = () => {
       inputRef.current?.focus();
     }
   }, [activeChatIndex, isThinking]);
+
+  const quickQuestions = [
+    { label: "Summarize My Receipts", bg: "bg-blue-500" },
+    { label: "What Did I Spend The Most On?", bg: "bg-red-500" },
+    { label: "Any Unusual Expenses?", bg: "bg-green-500" },
+    { label: "How Can I Save More?", bg: "bg-yellow-500" },
+  ];
 
   return (
     <div className="flex h-full bg-white rounded-xl shadow-lg overflow-hidden">
@@ -158,7 +252,7 @@ const Chatbot = () => {
             <span>Dashboard</span>
           </Link>
           <Link
-            to="/receipts"
+            to="/history"
             className="flex items-center space-x-2 text-gray-700 hover:text-blue-600"
           >
             <FaReceipt size={18} />
@@ -169,50 +263,45 @@ const Chatbot = () => {
 
       {/* Chat Area */}
       <div className="w-3/4 flex flex-col">
-        <div className="ml-3 p-4 border-b border-gray-200 bg-white">
+        <div className="ml-3 p-4 border-b border-gray-200 bg-white flex items-center justify-between">
           <h3 className="text-md font-semibold text-gray-800">
             {chats[activeChatIndex]?.title || "Chat"}
           </h3>
-        </div>
-
-        {/* Prompt Buttons */}
-        <div className="px-6 py-4 space-x-3 flex flex-wrap">
-          {[
-            { label: "Summarize My Receipts", color: "bg-blue-500" },
-            { label: "What Did I Spend The Most On?", color: "bg-red-500" },
-            { label: "Any Unusual Expenses?", color: "bg-green-500" },
-            {
-              label: "How Can I Save More?",
-              color: "bg-yellow-500 text-black",
-            },
-          ].map((btn, idx) => (
+          <div className="relative">
             <button
-              key={idx}
-              onClick={() => handleSendMessage(btn.label)}
-              className={`text-white px-4 py-2 rounded-md hover:opacity-90 transition ${btn.color}`}
+              onClick={() => setDropdownOpen(!dropdownOpen)}
+              className="px-4 py-2 text-sm bg-gray-100 border rounded-md hover:bg-gray-200"
             >
-              {btn.label}
+              Quick Questions
             </button>
-          ))}
+            {dropdownOpen && (
+              <div className="absolute right-0 mt-2 w-64 bg-white shadow-lg border rounded-md z-10">
+                {quickQuestions.map((q, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => {
+                      handleSendMessage(q.label);
+                      setDropdownOpen(false);
+                    }}
+                    className={`block w-full text-left px-4 py-2 ease-in-out rounded-md hover:text-white hover:${q.bg}`}
+                  >
+                    {q.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 hide-scrollbar">
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6 hide-scrollbar">
           {chats[activeChatIndex]?.messages.map((msg, idx) => (
-            <div
-              key={idx}
-              className={`flex ${
-                msg.sender === "user" ? "justify-end" : "justify-start"
-              }`}
-            >
-              <div
-                className={`px-4 py-2 rounded-lg max-w-xs ${
-                  msg.sender === "user"
-                    ? "bg-blue-500 text-white"
-                    : "bg-gray-200 text-gray-800"
-                }`}
-              >
-                {msg.text}
+            <div key={idx} className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"}`}>
+              <div className={`px-4 py-2 rounded-lg max-w-xl w-max ${msg.sender === "user" ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-800"}`}>
+                {typeof msg.text === "string" ? <p>{msg.text}</p> : null}
+                {msg.visualization && renderChart(msg.visualization)}
+                {msg.visualization?.caption && <p className="mt-2 text-sm text-gray-600 font-medium">{msg.visualization.caption}</p>}
+                {msg.explanation && <p className="mt-1 text-xs text-gray-500 italic">{msg.explanation}</p>}
               </div>
             </div>
           ))}

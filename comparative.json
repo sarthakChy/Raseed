@@ -1,0 +1,1185 @@
+{
+    "success": true,
+    "workflow_id": "52e2d261-d317-418e-9976-023ade7c382c",
+    "intent": "comparative",
+    "status": "completed",
+    "response": "{'insights': 'I am sorry, but I cannot compare your spending this year versus last year because I do not have any spending data available.', 'visualization': {'type': 'bar_chart', 'fields': {'x_axis': ['This Year', 'Last Year'], 'y_axis': [0, 0]}, 'caption': 'Spending this year compared to last year.'}, 'explanation': 'A bar chart is suitable for comparing spending between \"This Year\" and \"Last Year\" because it visually represents the magnitude of each year\\'s spending, allowing for easy comparison. The height of each bar corresponds to the spending amount for that year.'}",
+    "execution_time": 16.569316,
+    "step_results": {
+        "translate_query": {
+            "step_id": "translate_query",
+            "agent_name": "query_translation_agent",
+            "success": true,
+            "result": {
+                "success": true,
+                "structured_query": {
+                    "query_type": "spending_analysis",
+                    "entities": [],
+                    "time_range": {
+                        "type": "custom_range",
+                        "start_date": "2024-07-24",
+                        "end_date": "2025-07-24",
+                        "relative_period": "past year"
+                    },
+                    "filters": {
+                        "categories": [],
+                        "merchants": [],
+                        "amount_min": null,
+                        "amount_max": null,
+                        "tags": [],
+                        "exclude_categories": []
+                    },
+                    "analysis_parameters": {
+                        "aggregation_level": "monthly",
+                        "comparison_baseline": "last_year",
+                        "metrics": [
+                            "total_amount"
+                        ],
+                        "grouping": [
+                            "category"
+                        ],
+                        "sorting": null,
+                        "limit": null
+                    },
+                    "context_requirements": [
+                        "transactions"
+                    ],
+                    "original_query": "Compare my spending this year vs last year",
+                    "confidence_score": 0.85,
+                    "requires_clarification": false,
+                    "clarification_questions": []
+                },
+                "decomposition": null,
+                "validation": {
+                    "is_valid": true,
+                    "issues": [],
+                    "suggestions": [],
+                    "required_data": [
+                        "transactions"
+                    ],
+                    "estimated_complexity": {
+                        "level": "medium",
+                        "factors": [
+                            "custom_time_range",
+                            "grouping_required"
+                        ],
+                        "estimated_execution_time": 3.0,
+                        "requires_decomposition": false
+                    }
+                },
+                "processing_metadata": {
+                    "agent": "query_translation_agent",
+                    "timestamp": "2025-07-24T19:13:24.967082",
+                    "confidence": 0.85,
+                    "complexity": "medium"
+                },
+                "error": null,
+                "analysis_type": "spending_analysis"
+            },
+            "error": "",
+            "execution_time": 4.008155,
+            "retry_attempt": 0
+        },
+        "perform_comparison": {
+            "step_id": "perform_comparison",
+            "agent_name": "financial_analysis_agent",
+            "success": true,
+            "result": {
+                "success": true,
+                "results": {
+                    "success": true,
+                    "data": [
+                        {
+                            "transaction_id": "601263bc-087f-4793-9b6b-e31cdd6d1f1e",
+                            "amount": "8127.84",
+                            "category": "electronics",
+                            "subcategory": null,
+                            "transaction_date": "2025-07-23",
+                            "merchant_name": "Vijay Sales",
+                            "merchant_normalized": "Vijay Sales",
+                            "payment_method": "Credit Card"
+                        },
+                        {
+                            "transaction_id": "3482dd29-a5bd-46d0-afb6-6145cee6edb1",
+                            "amount": "407.10",
+                            "category": "shopping",
+                            "subcategory": null,
+                            "transaction_date": "2025-07-23",
+                            "merchant_name": "Apollo Pharmacy",
+                            "merchant_normalized": "Apollo Pharmacy",
+                            "payment_method": "CASH"
+                        },
+                        {
+                            "transaction_id": "ab771d3f-9603-4b8d-ac01-ee87d3b64b44",
+                            "amount": "352.82",
+                            "category": "food",
+                            "subcategory": null,
+                            "transaction_date": "2025-07-23",
+                            "merchant_name": "Domino's Pizza",
+                            "merchant_normalized": "Dominos",
+                            "payment_method": "Credit Card"
+                        },
+                        {
+                            "transaction_id": "7bb79c65-c702-4625-934c-12c855f4249a",
+                            "amount": "4598.46",
+                            "category": "shopping",
+                            "subcategory": null,
+                            "transaction_date": "2025-07-23",
+                            "merchant_name": "Westside",
+                            "merchant_normalized": "Westside",
+                            "payment_method": "Debit Card"
+                        },
+                        {
+                            "transaction_id": "fb85eab1-a663-452f-9e3d-981e395ce330",
+                            "amount": "560.50",
+                            "category": "groceries",
+                            "subcategory": null,
+                            "transaction_date": "2025-07-23",
+                            "merchant_name": "Spencer's Retail",
+                            "merchant_normalized": "Spencer's",
+                            "payment_method": "UPI"
+                        },
+                        {
+                            "transaction_id": "fa215ce0-80ed-4d35-8228-a0d92d681e5a",
+                            "amount": "212.40",
+                            "category": "food",
+                            "subcategory": null,
+                            "transaction_date": "2025-07-23",
+                            "merchant_name": "Binge Cafe",
+                            "merchant_normalized": "Binge Cafe",
+                            "payment_method": "CASH"
+                        },
+                        {
+                            "transaction_id": "0f306ff7-45a0-4e12-8987-ab57cf126dc5",
+                            "amount": "133.34",
+                            "category": "groceries",
+                            "subcategory": null,
+                            "transaction_date": "2025-07-23",
+                            "merchant_name": "Spencer's Retail",
+                            "merchant_normalized": "Spencer's",
+                            "payment_method": "CASH"
+                        },
+                        {
+                            "transaction_id": "0e7a58ca-8374-4ff8-a302-9b09dbb79ecf",
+                            "amount": "824.82",
+                            "category": "shopping",
+                            "subcategory": null,
+                            "transaction_date": "2025-07-23",
+                            "merchant_name": "Westside",
+                            "merchant_normalized": "Westside",
+                            "payment_method": "Credit Card"
+                        },
+                        {
+                            "transaction_id": "0e3e6403-c56d-4fed-876d-f211f08481ba",
+                            "amount": "1061.55",
+                            "category": "food",
+                            "subcategory": null,
+                            "transaction_date": "2025-07-23",
+                            "merchant_name": "Domino's Pizza",
+                            "merchant_normalized": "Dominos",
+                            "payment_method": "Wallet"
+                        },
+                        {
+                            "transaction_id": "fbf591ac-79ad-41ae-8c5b-e80c77358d26",
+                            "amount": "1768.82",
+                            "category": "electronics",
+                            "subcategory": null,
+                            "transaction_date": "2025-07-23",
+                            "merchant_name": "Croma Store",
+                            "merchant_normalized": "Croma",
+                            "payment_method": "Credit Card"
+                        },
+                        {
+                            "transaction_id": "46f31b76-0716-4440-a4bf-18266dc2ef80",
+                            "amount": "194.70",
+                            "category": "groceries",
+                            "subcategory": null,
+                            "transaction_date": "2025-07-23",
+                            "merchant_name": "BigBasket #123",
+                            "merchant_normalized": "BigBasket",
+                            "payment_method": "UPI"
+                        },
+                        {
+                            "transaction_id": "c73e9615-ba56-4385-92d4-d8fc95128007",
+                            "amount": "663.16",
+                            "category": "groceries",
+                            "subcategory": null,
+                            "transaction_date": "2025-07-23",
+                            "merchant_name": "Spencer's Retail",
+                            "merchant_normalized": "Spencer's",
+                            "payment_method": "Credit Card"
+                        },
+                        {
+                            "transaction_id": "ac5ea3b4-de3f-4fb3-b5af-d272822bf42a",
+                            "amount": "52.79",
+                            "category": "general",
+                            "subcategory": null,
+                            "transaction_date": "2025-07-23",
+                            "merchant_name": "SUPERMARKET",
+                            "merchant_normalized": "SUPERMARKET",
+                            "payment_method": null
+                        },
+                        {
+                            "transaction_id": "c777f5bf-253f-4226-8f42-6e995f2c859f",
+                            "amount": "1058.46",
+                            "category": "food",
+                            "subcategory": null,
+                            "transaction_date": "2025-07-23",
+                            "merchant_name": "Domino's Pizza",
+                            "merchant_normalized": "Dominos",
+                            "payment_method": "CASH"
+                        },
+                        {
+                            "transaction_id": "4563b4d4-fa7e-423b-a56e-6f6ac36c4d2f",
+                            "amount": "52.79",
+                            "category": "general",
+                            "subcategory": null,
+                            "transaction_date": "2025-07-23",
+                            "merchant_name": "SUPERMARKET",
+                            "merchant_normalized": "SUPERMARKET",
+                            "payment_method": null
+                        },
+                        {
+                            "transaction_id": "9e28298c-de24-45f7-850e-33daa8e16556",
+                            "amount": "243.08",
+                            "category": "food",
+                            "subcategory": null,
+                            "transaction_date": "2025-07-23",
+                            "merchant_name": "Domino's Pizza",
+                            "merchant_normalized": "Dominos",
+                            "payment_method": "CASH"
+                        },
+                        {
+                            "transaction_id": "55d68325-a64e-41b6-99a8-fa584279b275",
+                            "amount": "25.97",
+                            "category": "general",
+                            "subcategory": null,
+                            "transaction_date": "2025-07-23",
+                            "merchant_name": "The Shop",
+                            "merchant_normalized": "The Shop",
+                            "payment_method": null
+                        },
+                        {
+                            "transaction_id": "3f04f5ab-5966-4b60-a41c-d45c1fe17fd5",
+                            "amount": "802.40",
+                            "category": "food",
+                            "subcategory": null,
+                            "transaction_date": "2025-07-23",
+                            "merchant_name": "Cafe Coffee Day",
+                            "merchant_normalized": "CCD",
+                            "payment_method": "UPI"
+                        },
+                        {
+                            "transaction_id": "3ee4f4ab-7275-4940-908f-b130ceaa519b",
+                            "amount": "4598.46",
+                            "category": "shopping",
+                            "subcategory": null,
+                            "transaction_date": "2025-07-23",
+                            "merchant_name": "Westside",
+                            "merchant_normalized": "Westside",
+                            "payment_method": "Credit Card"
+                        },
+                        {
+                            "transaction_id": "989b6e33-ea16-4837-b2a2-1298d0ff7da1",
+                            "amount": "2357.64",
+                            "category": "shopping",
+                            "subcategory": null,
+                            "transaction_date": "2025-07-23",
+                            "merchant_name": "Max Fashion",
+                            "merchant_normalized": "Max",
+                            "payment_method": "CASH"
+                        },
+                        {
+                            "transaction_id": "7e09dcd4-7658-4f53-aa56-29eb90b42da6",
+                            "amount": "708.00",
+                            "category": "food",
+                            "subcategory": null,
+                            "transaction_date": "2025-07-23",
+                            "merchant_name": "Binge Cafe",
+                            "merchant_normalized": "Binge Cafe",
+                            "payment_method": "UPI"
+                        },
+                        {
+                            "transaction_id": "f2302af6-81a8-4d6b-bd8b-3e16709ca528",
+                            "amount": "4716.46",
+                            "category": "electronics",
+                            "subcategory": null,
+                            "transaction_date": "2025-07-23",
+                            "merchant_name": "Croma Store",
+                            "merchant_normalized": "Croma",
+                            "payment_method": "Debit Card"
+                        },
+                        {
+                            "transaction_id": "372a0564-6fbc-4d08-b083-055bd57b746d",
+                            "amount": "5770.80",
+                            "category": "electronics",
+                            "subcategory": null,
+                            "transaction_date": "2025-07-22",
+                            "merchant_name": "Vijay Sales",
+                            "merchant_normalized": "Vijay Sales",
+                            "payment_method": "Wallet"
+                        },
+                        {
+                            "transaction_id": "35288acc-9e0e-4202-a511-7a09bc687cb2",
+                            "amount": "640.50",
+                            "category": "groceries",
+                            "subcategory": null,
+                            "transaction_date": "2025-07-20",
+                            "merchant_name": "Reliance Fresh #456",
+                            "merchant_normalized": "Reliance Fresh",
+                            "payment_method": "Wallet"
+                        },
+                        {
+                            "transaction_id": "b836bc33-bf54-4c35-abe6-4354019a7740",
+                            "amount": "44.10",
+                            "category": "groceries",
+                            "subcategory": null,
+                            "transaction_date": "2025-07-20",
+                            "merchant_name": "Spencer's Retail",
+                            "merchant_normalized": "Spencer's",
+                            "payment_method": "UPI"
+                        },
+                        {
+                            "transaction_id": "30dfe97c-2fca-4615-b8c9-afc09db1037c",
+                            "amount": "950.00",
+                            "category": "general",
+                            "subcategory": null,
+                            "transaction_date": "2025-07-18",
+                            "merchant_name": "Satya Food Kapoor's BALLE",
+                            "merchant_normalized": "Satya Food Kapoor's BALLE",
+                            "payment_method": "Online [Swiggy]"
+                        },
+                        {
+                            "transaction_id": "fe4a9524-aa7f-4718-8f50-76bb3a147113",
+                            "amount": "950.00",
+                            "category": "general",
+                            "subcategory": null,
+                            "transaction_date": "2025-07-18",
+                            "merchant_name": "Satya Food Kapoor's BALLE",
+                            "merchant_normalized": "Satya Food Kapoor's BALLE",
+                            "payment_method": "Online [Swiggy]"
+                        },
+                        {
+                            "transaction_id": "9852516f-1a11-4a65-b39e-44c59399f8d0",
+                            "amount": "950.00",
+                            "category": "general",
+                            "subcategory": null,
+                            "transaction_date": "2025-07-18",
+                            "merchant_name": "Satya Food Kapoor's BALLE",
+                            "merchant_normalized": "Satya Food Kapoor's BALLE",
+                            "payment_method": "Online [Swiggy]"
+                        },
+                        {
+                            "transaction_id": "53f31bd4-5e09-4672-a01b-a0b1a97a4715",
+                            "amount": "1678.95",
+                            "category": "electronics",
+                            "subcategory": null,
+                            "transaction_date": "2025-07-18",
+                            "merchant_name": "Vijay Sales",
+                            "merchant_normalized": "Vijay Sales",
+                            "payment_method": "Cash"
+                        },
+                        {
+                            "transaction_id": "cee7ef81-72bf-4f71-8213-7390eca80f1f",
+                            "amount": "950.00",
+                            "category": "food",
+                            "subcategory": null,
+                            "transaction_date": "2025-07-18",
+                            "merchant_name": "Satya Food Kapoor's BALLE",
+                            "merchant_normalized": "Satya Food Kapoor's BALLE",
+                            "payment_method": "Online [Swiggy]"
+                        },
+                        {
+                            "transaction_id": "bea091d8-0af8-49b4-9083-c5746ce7fb7b",
+                            "amount": "1993.95",
+                            "category": "shopping",
+                            "subcategory": null,
+                            "transaction_date": "2025-07-17",
+                            "merchant_name": "Westside",
+                            "merchant_normalized": "Westside",
+                            "payment_method": "Credit Card"
+                        },
+                        {
+                            "transaction_id": "7a432f78-9d2f-413a-9b99-f38b8fbdb908",
+                            "amount": "1162.30",
+                            "category": "groceries",
+                            "subcategory": null,
+                            "transaction_date": "2025-07-16",
+                            "merchant_name": "BigBasket #123",
+                            "merchant_normalized": "BigBasket",
+                            "payment_method": "Net Banking"
+                        },
+                        {
+                            "transaction_id": "60c098c2-645f-4d1f-91c9-fd1d1ce1c87d",
+                            "amount": "4718.82",
+                            "category": "electronics",
+                            "subcategory": null,
+                            "transaction_date": "2025-07-14",
+                            "merchant_name": "Croma Store",
+                            "merchant_normalized": "Croma",
+                            "payment_method": "Net Banking"
+                        },
+                        {
+                            "transaction_id": "af1dbdab-d54d-4b5c-b19d-6093c812ba40",
+                            "amount": "1258.88",
+                            "category": "groceries",
+                            "subcategory": null,
+                            "transaction_date": "2025-07-12",
+                            "merchant_name": "Spencer's Retail",
+                            "merchant_normalized": "Spencer's",
+                            "payment_method": "UPI"
+                        },
+                        {
+                            "transaction_id": "c9770b8c-bed9-4b97-963c-64bbe32b8665",
+                            "amount": "1321.60",
+                            "category": "groceries",
+                            "subcategory": null,
+                            "transaction_date": "2025-07-08",
+                            "merchant_name": "Reliance Fresh #456",
+                            "merchant_normalized": "Reliance Fresh",
+                            "payment_method": "Debit Card"
+                        },
+                        {
+                            "transaction_id": "063221af-f503-4c88-a823-b3ec07598d7b",
+                            "amount": "1790.88",
+                            "category": "shopping",
+                            "subcategory": null,
+                            "transaction_date": "2025-07-06",
+                            "merchant_name": "Max Fashion",
+                            "merchant_normalized": "Max",
+                            "payment_method": "Net Banking"
+                        },
+                        {
+                            "transaction_id": "e23fc862-fba2-4f91-b4df-8e1c5868e3e3",
+                            "amount": "3528.20",
+                            "category": "electronics",
+                            "subcategory": null,
+                            "transaction_date": "2025-07-02",
+                            "merchant_name": "Vijay Sales",
+                            "merchant_normalized": "Vijay Sales",
+                            "payment_method": "Cash"
+                        },
+                        {
+                            "transaction_id": "25d138de-cb85-4eb4-a386-8b0fa6c754b7",
+                            "amount": "378.00",
+                            "category": "food",
+                            "subcategory": null,
+                            "transaction_date": "2025-07-01",
+                            "merchant_name": "Binge Cafe",
+                            "merchant_normalized": "Binge Cafe",
+                            "payment_method": "Credit Card"
+                        },
+                        {
+                            "transaction_id": "787f3a9f-e131-4620-9a74-b64d33313bbe",
+                            "amount": "656.32",
+                            "category": "groceries",
+                            "subcategory": null,
+                            "transaction_date": "2025-06-29",
+                            "merchant_name": "BigBasket #123",
+                            "merchant_normalized": "BigBasket",
+                            "payment_method": "Debit Card"
+                        },
+                        {
+                            "transaction_id": "e81fb7f8-1b62-4420-930c-a72e748e3bdb",
+                            "amount": "733.95",
+                            "category": "shopping",
+                            "subcategory": null,
+                            "transaction_date": "2025-06-27",
+                            "merchant_name": "Westside",
+                            "merchant_normalized": "Westside",
+                            "payment_method": "Cash"
+                        },
+                        {
+                            "transaction_id": "82669e6f-1674-4836-8838-3d19ff86be70",
+                            "amount": "4825.80",
+                            "category": "shopping",
+                            "subcategory": null,
+                            "transaction_date": "2025-06-16",
+                            "merchant_name": "Westside",
+                            "merchant_normalized": "Westside",
+                            "payment_method": "Wallet"
+                        },
+                        {
+                            "transaction_id": "3342541c-ee41-4a81-b6ed-806058e25b4f",
+                            "amount": "329.22",
+                            "category": "groceries",
+                            "subcategory": null,
+                            "transaction_date": "2025-06-15",
+                            "merchant_name": "BigBasket #123",
+                            "merchant_normalized": "BigBasket",
+                            "payment_method": "Wallet"
+                        },
+                        {
+                            "transaction_id": "63466a68-7370-4889-ac0b-eeaab31edf6c",
+                            "amount": "3444.00",
+                            "category": "shopping",
+                            "subcategory": null,
+                            "transaction_date": "2025-06-15",
+                            "merchant_name": "Nykaa Store",
+                            "merchant_normalized": "Nykaa",
+                            "payment_method": "Cash"
+                        },
+                        {
+                            "transaction_id": "a966b1b2-213e-4012-8459-b141ce3ca2e4",
+                            "amount": "7276.64",
+                            "category": "electronics",
+                            "subcategory": null,
+                            "transaction_date": "2025-06-14",
+                            "merchant_name": "Croma Store",
+                            "merchant_normalized": "Croma",
+                            "payment_method": "Net Banking"
+                        },
+                        {
+                            "transaction_id": "cb159ebc-e132-4ab8-a2d1-f3652a146eff",
+                            "amount": "831.90",
+                            "category": "shopping",
+                            "subcategory": null,
+                            "transaction_date": "2025-06-12",
+                            "merchant_name": "Apollo Pharmacy",
+                            "merchant_normalized": "Apollo Pharmacy",
+                            "payment_method": "Credit Card"
+                        },
+                        {
+                            "transaction_id": "e82742ba-ec0d-46bc-b07d-d906d278d9b0",
+                            "amount": "1905.75",
+                            "category": "food",
+                            "subcategory": null,
+                            "transaction_date": "2025-06-08",
+                            "merchant_name": "Domino's Pizza",
+                            "merchant_normalized": "Dominos",
+                            "payment_method": "Debit Card"
+                        },
+                        {
+                            "transaction_id": "4c9faacd-6540-43b6-aa28-8c6164e542e4",
+                            "amount": "3772.46",
+                            "category": "shopping",
+                            "subcategory": null,
+                            "transaction_date": "2025-06-07",
+                            "merchant_name": "Max Fashion",
+                            "merchant_normalized": "Max",
+                            "payment_method": "Wallet"
+                        },
+                        {
+                            "transaction_id": "bede6c1a-ba28-4279-9d79-46a9a7d29cb0",
+                            "amount": "5147.52",
+                            "category": "shopping",
+                            "subcategory": null,
+                            "transaction_date": "2025-06-04",
+                            "merchant_name": "Westside",
+                            "merchant_normalized": "Westside",
+                            "payment_method": "Debit Card"
+                        },
+                        {
+                            "transaction_id": "08b7488d-f841-4306-88bd-3fb767671721",
+                            "amount": "306.80",
+                            "category": "groceries",
+                            "subcategory": null,
+                            "transaction_date": "2025-05-31",
+                            "merchant_name": "Reliance Fresh #456",
+                            "merchant_normalized": "Reliance Fresh",
+                            "payment_method": "Credit Card"
+                        },
+                        {
+                            "transaction_id": "40ad7554-5911-4300-b929-9b1508a1d0ab",
+                            "amount": "867.30",
+                            "category": "groceries",
+                            "subcategory": null,
+                            "transaction_date": "2025-05-25",
+                            "merchant_name": "Reliance Fresh #456",
+                            "merchant_normalized": "Reliance Fresh",
+                            "payment_method": "Net Banking"
+                        },
+                        {
+                            "transaction_id": "d6e80b7f-ec6e-46a9-8f3b-89d0bf8a61e2",
+                            "amount": "829.50",
+                            "category": "groceries",
+                            "subcategory": null,
+                            "transaction_date": "2025-05-23",
+                            "merchant_name": "BigBasket #123",
+                            "merchant_normalized": "BigBasket",
+                            "payment_method": "Net Banking"
+                        },
+                        {
+                            "transaction_id": "903a7d6a-7faf-4706-abfa-1aeea0f055fe",
+                            "amount": "9504.32",
+                            "category": "electronics",
+                            "subcategory": null,
+                            "transaction_date": "2025-05-17",
+                            "merchant_name": "Vijay Sales",
+                            "merchant_normalized": "Vijay Sales",
+                            "payment_method": "Cash"
+                        },
+                        {
+                            "transaction_id": "5880b7b7-c0cf-48e6-975e-e0d30d35fecb",
+                            "amount": "2247.90",
+                            "category": "shopping",
+                            "subcategory": null,
+                            "transaction_date": "2025-05-14",
+                            "merchant_name": "Nykaa Store",
+                            "merchant_normalized": "Nykaa",
+                            "payment_method": "Debit Card"
+                        },
+                        {
+                            "transaction_id": "0ed1484e-82a5-4a6e-a182-5f3a696f927d",
+                            "amount": "2619.75",
+                            "category": "shopping",
+                            "subcategory": null,
+                            "transaction_date": "2025-05-11",
+                            "merchant_name": "Nykaa Store",
+                            "merchant_normalized": "Nykaa",
+                            "payment_method": "Net Banking"
+                        },
+                        {
+                            "transaction_id": "c837f1c2-bf50-4bdc-b4d4-f43abe9e63a9",
+                            "amount": "420.00",
+                            "category": "shopping",
+                            "subcategory": null,
+                            "transaction_date": "2025-05-06",
+                            "merchant_name": "Apollo Pharmacy",
+                            "merchant_normalized": "Apollo Pharmacy",
+                            "payment_method": "Debit Card"
+                        },
+                        {
+                            "transaction_id": "3cab1806-64bc-413f-9d1b-490661bb9318",
+                            "amount": "1334.58",
+                            "category": "groceries",
+                            "subcategory": null,
+                            "transaction_date": "2025-04-30",
+                            "merchant_name": "Spencer's Retail",
+                            "merchant_normalized": "Spencer's",
+                            "payment_method": "Cash"
+                        },
+                        {
+                            "transaction_id": "c009c1f6-2d54-4dba-ad83-d0d37433f6ec",
+                            "amount": "719.80",
+                            "category": "groceries",
+                            "subcategory": null,
+                            "transaction_date": "2025-04-29",
+                            "merchant_name": "Spencer's Retail",
+                            "merchant_normalized": "Spencer's",
+                            "payment_method": "Credit Card"
+                        },
+                        {
+                            "transaction_id": "47530297-390b-42e3-a945-74dc84bbd498",
+                            "amount": "1678.95",
+                            "category": "electronics",
+                            "subcategory": null,
+                            "transaction_date": "2025-04-25",
+                            "merchant_name": "Vijay Sales",
+                            "merchant_normalized": "Vijay Sales",
+                            "payment_method": "UPI"
+                        },
+                        {
+                            "transaction_id": "3446f1c3-3851-4097-9085-d117e53c2405",
+                            "amount": "971.25",
+                            "category": "groceries",
+                            "subcategory": null,
+                            "transaction_date": "2025-04-21",
+                            "merchant_name": "Reliance Fresh #456",
+                            "merchant_normalized": "Reliance Fresh",
+                            "payment_method": "Net Banking"
+                        },
+                        {
+                            "transaction_id": "a66ea89d-85c9-46c1-95bc-c678d2430327",
+                            "amount": "8955.52",
+                            "category": "electronics",
+                            "subcategory": null,
+                            "transaction_date": "2025-04-18",
+                            "merchant_name": "Croma Store",
+                            "merchant_normalized": "Croma",
+                            "payment_method": "Debit Card"
+                        },
+                        {
+                            "transaction_id": "6c55be15-7465-481d-8b64-4f8ff5c43559",
+                            "amount": "1125.72",
+                            "category": "food",
+                            "subcategory": null,
+                            "transaction_date": "2025-04-13",
+                            "merchant_name": "Domino's Pizza",
+                            "merchant_normalized": "Dominos",
+                            "payment_method": "Wallet"
+                        },
+                        {
+                            "transaction_id": "24ff4e62-9cc9-4994-8567-cad92ecd2f7b",
+                            "amount": "1886.82",
+                            "category": "shopping",
+                            "subcategory": null,
+                            "transaction_date": "2025-04-08",
+                            "merchant_name": "Max Fashion",
+                            "merchant_normalized": "Max",
+                            "payment_method": "Debit Card"
+                        },
+                        {
+                            "transaction_id": "1c87fbf2-045c-4c81-8260-a2688bfcde26",
+                            "amount": "4364.64",
+                            "category": "electronics",
+                            "subcategory": null,
+                            "transaction_date": "2025-04-05",
+                            "merchant_name": "Vijay Sales",
+                            "merchant_normalized": "Vijay Sales",
+                            "payment_method": "Debit Card"
+                        },
+                        {
+                            "transaction_id": "f6209977-fb11-4aca-85ea-0c59bbe463a0",
+                            "amount": "1480.90",
+                            "category": "groceries",
+                            "subcategory": null,
+                            "transaction_date": "2025-04-03",
+                            "merchant_name": "Reliance Fresh #456",
+                            "merchant_normalized": "Reliance Fresh",
+                            "payment_method": "Cash"
+                        },
+                        {
+                            "transaction_id": "7a68ab92-f2e2-4839-97fa-2d19e7d2c599",
+                            "amount": "901.60",
+                            "category": "groceries",
+                            "subcategory": null,
+                            "transaction_date": "2025-04-01",
+                            "merchant_name": "Reliance Fresh #456",
+                            "merchant_normalized": "Reliance Fresh",
+                            "payment_method": "Credit Card"
+                        },
+                        {
+                            "transaction_id": "62c8f1a0-b3cc-4e81-a4dc-2cd9b3b0b6c5",
+                            "amount": "619.50",
+                            "category": "shopping",
+                            "subcategory": null,
+                            "transaction_date": "2025-03-31",
+                            "merchant_name": "Apollo Pharmacy",
+                            "merchant_normalized": "Apollo Pharmacy",
+                            "payment_method": "Wallet"
+                        },
+                        {
+                            "transaction_id": "9be00982-c09e-40b3-8576-259479f84915",
+                            "amount": "1483.26",
+                            "category": "groceries",
+                            "subcategory": null,
+                            "transaction_date": "2025-03-30",
+                            "merchant_name": "Spencer's Retail",
+                            "merchant_normalized": "Spencer's",
+                            "payment_method": "Net Banking"
+                        },
+                        {
+                            "transaction_id": "4cf1f8ff-0866-45a8-8230-9a81b6991f7b",
+                            "amount": "1359.75",
+                            "category": "groceries",
+                            "subcategory": null,
+                            "transaction_date": "2025-03-30",
+                            "merchant_name": "Reliance Fresh #456",
+                            "merchant_normalized": "Reliance Fresh",
+                            "payment_method": "Wallet"
+                        },
+                        {
+                            "transaction_id": "c5912d8c-9d0f-4964-8a0d-926acd5ef6ed",
+                            "amount": "1170.40",
+                            "category": "food",
+                            "subcategory": null,
+                            "transaction_date": "2025-03-29",
+                            "merchant_name": "Domino's Pizza",
+                            "merchant_normalized": "Dominos",
+                            "payment_method": "Cash"
+                        },
+                        {
+                            "transaction_id": "0f9b7fd4-6f4c-4fdf-b30c-d84b0caa78cf",
+                            "amount": "1190.56",
+                            "category": "groceries",
+                            "subcategory": null,
+                            "transaction_date": "2025-03-29",
+                            "merchant_name": "Spencer's Retail",
+                            "merchant_normalized": "Spencer's",
+                            "payment_method": "Net Banking"
+                        },
+                        {
+                            "transaction_id": "d32b30b6-e39e-45b7-a989-96170d6b9652",
+                            "amount": "578.20",
+                            "category": "shopping",
+                            "subcategory": null,
+                            "transaction_date": "2025-03-29",
+                            "merchant_name": "Nykaa Store",
+                            "merchant_normalized": "Nykaa",
+                            "payment_method": "Wallet"
+                        },
+                        {
+                            "transaction_id": "96406984-87fb-4360-8a1e-bf01d06d4977",
+                            "amount": "2396.80",
+                            "category": "shopping",
+                            "subcategory": null,
+                            "transaction_date": "2025-03-28",
+                            "merchant_name": "Nykaa Store",
+                            "merchant_normalized": "Nykaa",
+                            "payment_method": "Credit Card"
+                        },
+                        {
+                            "transaction_id": "a646ddfc-3034-4221-ae12-9d15d09425d0",
+                            "amount": "10013.48",
+                            "category": "electronics",
+                            "subcategory": null,
+                            "transaction_date": "2025-03-26",
+                            "merchant_name": "Vijay Sales",
+                            "merchant_normalized": "Vijay Sales",
+                            "payment_method": "Credit Card"
+                        },
+                        {
+                            "transaction_id": "5f969ce6-d455-4b09-acb6-ea1e652e9b02",
+                            "amount": "2712.82",
+                            "category": "electronics",
+                            "subcategory": null,
+                            "transaction_date": "2025-03-24",
+                            "merchant_name": "Vijay Sales",
+                            "merchant_normalized": "Vijay Sales",
+                            "payment_method": "Cash"
+                        },
+                        {
+                            "transaction_id": "02967788-ecc0-4746-9e2f-c8c5ce6a9848",
+                            "amount": "2365.90",
+                            "category": "shopping",
+                            "subcategory": null,
+                            "transaction_date": "2025-03-21",
+                            "merchant_name": "Nykaa Store",
+                            "merchant_normalized": "Nykaa",
+                            "payment_method": "Wallet"
+                        },
+                        {
+                            "transaction_id": "a6e8bd32-07a2-4e65-ae28-79b03883d9d1",
+                            "amount": "3776.85",
+                            "category": "shopping",
+                            "subcategory": null,
+                            "transaction_date": "2025-03-18",
+                            "merchant_name": "Max Fashion",
+                            "merchant_normalized": "Max",
+                            "payment_method": "Net Banking"
+                        },
+                        {
+                            "transaction_id": "57a381ae-cc37-4072-97a6-5520971a7828",
+                            "amount": "2240.82",
+                            "category": "shopping",
+                            "subcategory": null,
+                            "transaction_date": "2025-03-16",
+                            "merchant_name": "Westside",
+                            "merchant_normalized": "Westside",
+                            "payment_method": "Net Banking"
+                        },
+                        {
+                            "transaction_id": "8c745304-d3b1-4da6-af7f-86ef286b7d83",
+                            "amount": "694.40",
+                            "category": "food",
+                            "subcategory": null,
+                            "transaction_date": "2025-03-15",
+                            "merchant_name": "Domino's Pizza",
+                            "merchant_normalized": "Dominos",
+                            "payment_method": "UPI"
+                        },
+                        {
+                            "transaction_id": "422a86f6-8aba-428a-9e71-6b805f66a644",
+                            "amount": "289.10",
+                            "category": "shopping",
+                            "subcategory": null,
+                            "transaction_date": "2025-03-14",
+                            "merchant_name": "Nykaa Store",
+                            "merchant_normalized": "Nykaa",
+                            "payment_method": "Credit Card"
+                        },
+                        {
+                            "transaction_id": "a19d7092-7cb8-4ce4-bf91-3e7e8ba62dce",
+                            "amount": "1449.00",
+                            "category": "food",
+                            "subcategory": null,
+                            "transaction_date": "2025-03-13",
+                            "merchant_name": "Cafe Coffee Day",
+                            "merchant_normalized": "CCD",
+                            "payment_method": "Wallet"
+                        },
+                        {
+                            "transaction_id": "657add99-0fb6-4e31-95f5-4ba78d63e2be",
+                            "amount": "1532.82",
+                            "category": "electronics",
+                            "subcategory": null,
+                            "transaction_date": "2025-03-13",
+                            "merchant_name": "Croma Store",
+                            "merchant_normalized": "Croma",
+                            "payment_method": "Debit Card"
+                        },
+                        {
+                            "transaction_id": "ea50605f-e059-42d8-b63f-bfaa361af38a",
+                            "amount": "1859.20",
+                            "category": "shopping",
+                            "subcategory": null,
+                            "transaction_date": "2025-03-11",
+                            "merchant_name": "Nykaa Store",
+                            "merchant_normalized": "Nykaa",
+                            "payment_method": "Debit Card"
+                        },
+                        {
+                            "transaction_id": "9382022d-1805-4009-b0b1-3b8244efaa71",
+                            "amount": "1281.00",
+                            "category": "food",
+                            "subcategory": null,
+                            "transaction_date": "2025-03-05",
+                            "merchant_name": "Binge Cafe",
+                            "merchant_normalized": "Binge Cafe",
+                            "payment_method": "Debit Card"
+                        },
+                        {
+                            "transaction_id": "7a17af6d-86ba-4022-82a1-ed9380c677d8",
+                            "amount": "1109.20",
+                            "category": "food",
+                            "subcategory": null,
+                            "transaction_date": "2025-03-05",
+                            "merchant_name": "Binge Cafe",
+                            "merchant_normalized": "Binge Cafe",
+                            "payment_method": "Debit Card"
+                        },
+                        {
+                            "transaction_id": "e33d426a-544b-44e8-a958-09577ca12ff5",
+                            "amount": "2240.82",
+                            "category": "shopping",
+                            "subcategory": null,
+                            "transaction_date": "2025-03-03",
+                            "merchant_name": "Westside",
+                            "merchant_normalized": "Westside",
+                            "payment_method": "Debit Card"
+                        },
+                        {
+                            "transaction_id": "e03996ef-8f63-42c8-a498-387cb2d8c61c",
+                            "amount": "851.20",
+                            "category": "food",
+                            "subcategory": null,
+                            "transaction_date": "2025-03-03",
+                            "merchant_name": "Binge Cafe",
+                            "merchant_normalized": "Binge Cafe",
+                            "payment_method": "Credit Card"
+                        },
+                        {
+                            "transaction_id": "ff25c939-900b-4f96-8056-bc5774f76aca",
+                            "amount": "660.80",
+                            "category": "food",
+                            "subcategory": null,
+                            "transaction_date": "2025-03-01",
+                            "merchant_name": "Cafe Coffee Day",
+                            "merchant_normalized": "CCD",
+                            "payment_method": "Debit Card"
+                        },
+                        {
+                            "transaction_id": "4e3445c4-3bbb-4773-8dec-75a345329f52",
+                            "amount": "126.00",
+                            "category": "groceries",
+                            "subcategory": null,
+                            "transaction_date": "2025-03-01",
+                            "merchant_name": "Reliance Fresh #456",
+                            "merchant_normalized": "Reliance Fresh",
+                            "payment_method": "Cash"
+                        },
+                        {
+                            "transaction_id": "590a587e-4bbd-4a13-8752-989d49ead026",
+                            "amount": "1327.20",
+                            "category": "groceries",
+                            "subcategory": null,
+                            "transaction_date": "2025-02-28",
+                            "merchant_name": "Reliance Fresh #456",
+                            "merchant_normalized": "Reliance Fresh",
+                            "payment_method": "Credit Card"
+                        },
+                        {
+                            "transaction_id": "bdaa8721-3d65-4ccb-a8d3-fc71f375e830",
+                            "amount": "1790.88",
+                            "category": "shopping",
+                            "subcategory": null,
+                            "transaction_date": "2025-02-27",
+                            "merchant_name": "Max Fashion",
+                            "merchant_normalized": "Max",
+                            "payment_method": "Wallet"
+                        },
+                        {
+                            "transaction_id": "f56d9eb4-c475-41a4-ba61-33002bc0c861",
+                            "amount": "279.30",
+                            "category": "groceries",
+                            "subcategory": null,
+                            "transaction_date": "2025-02-26",
+                            "merchant_name": "BigBasket #123",
+                            "merchant_normalized": "BigBasket",
+                            "payment_method": "Net Banking"
+                        },
+                        {
+                            "transaction_id": "518cad7a-74c7-4a39-805e-6c1c873d099f",
+                            "amount": "716.80",
+                            "category": "food",
+                            "subcategory": null,
+                            "transaction_date": "2025-02-23",
+                            "merchant_name": "Binge Cafe",
+                            "merchant_normalized": "Binge Cafe",
+                            "payment_method": "UPI"
+                        },
+                        {
+                            "transaction_id": "73a4e31e-4588-4d65-9a3d-63e41f6131df",
+                            "amount": "1342.88",
+                            "category": "shopping",
+                            "subcategory": null,
+                            "transaction_date": "2025-02-22",
+                            "merchant_name": "Max Fashion",
+                            "merchant_normalized": "Max",
+                            "payment_method": "Wallet"
+                        },
+                        {
+                            "transaction_id": "c5ea285b-4de1-46a0-b193-796957a0b7b0",
+                            "amount": "1085.28",
+                            "category": "groceries",
+                            "subcategory": null,
+                            "transaction_date": "2025-02-20",
+                            "merchant_name": "BigBasket #123",
+                            "merchant_normalized": "BigBasket",
+                            "payment_method": "Credit Card"
+                        },
+                        {
+                            "transaction_id": "1315727c-8800-4a36-bfae-59903e3e1879",
+                            "amount": "2247.00",
+                            "category": "shopping",
+                            "subcategory": null,
+                            "transaction_date": "2025-02-12",
+                            "merchant_name": "Nykaa Store",
+                            "merchant_normalized": "Nykaa",
+                            "payment_method": "Credit Card"
+                        },
+                        {
+                            "transaction_id": "5a5eccc9-ba86-473b-bacc-e3d98f68145c",
+                            "amount": "4615.80",
+                            "category": "shopping",
+                            "subcategory": null,
+                            "transaction_date": "2025-02-10",
+                            "merchant_name": "Max Fashion",
+                            "merchant_normalized": "Max",
+                            "payment_method": "Cash"
+                        },
+                        {
+                            "transaction_id": "1e75f8ed-753c-42bd-9ca6-083d2942e861",
+                            "amount": "1068.90",
+                            "category": "groceries",
+                            "subcategory": null,
+                            "transaction_date": "2025-02-08",
+                            "merchant_name": "Spencer's Retail",
+                            "merchant_normalized": "Spencer's",
+                            "payment_method": "UPI"
+                        },
+                        {
+                            "transaction_id": "4827b254-2ae3-4227-82cd-ad721933a816",
+                            "amount": "519.75",
+                            "category": "shopping",
+                            "subcategory": null,
+                            "transaction_date": "2025-02-06",
+                            "merchant_name": "Apollo Pharmacy",
+                            "merchant_normalized": "Apollo Pharmacy",
+                            "payment_method": "Cash"
+                        },
+                        {
+                            "transaction_id": "fd7a1cf3-c5e6-448d-81d2-13fb0996c587",
+                            "amount": "268.80",
+                            "category": "food",
+                            "subcategory": null,
+                            "transaction_date": "2025-02-05",
+                            "merchant_name": "Cafe Coffee Day",
+                            "merchant_normalized": "CCD",
+                            "payment_method": "Credit Card"
+                        },
+                        {
+                            "transaction_id": "28dfd8f9-04d8-49be-90e9-c88b65403ffe",
+                            "amount": "627.90",
+                            "category": "food",
+                            "subcategory": null,
+                            "transaction_date": "2025-02-05",
+                            "merchant_name": "Domino's Pizza",
+                            "merchant_normalized": "Dominos",
+                            "payment_method": "Net Banking"
+                        },
+                        {
+                            "transaction_id": "50d23143-75b6-41b4-ae79-6a3f02526835",
+                            "amount": "672.00",
+                            "category": "food",
+                            "subcategory": null,
+                            "transaction_date": "2025-02-05",
+                            "merchant_name": "Binge Cafe",
+                            "merchant_normalized": "Binge Cafe",
+                            "payment_method": "UPI"
+                        },
+                        {
+                            "transaction_id": "d2a85482-b345-4e5d-94ce-35db9cee94ab",
+                            "amount": "638.40",
+                            "category": "shopping",
+                            "subcategory": null,
+                            "transaction_date": "2025-02-02",
+                            "merchant_name": "Apollo Pharmacy",
+                            "merchant_normalized": "Apollo Pharmacy",
+                            "payment_method": "Credit Card"
+                        },
+                        {
+                            "transaction_id": "f33a06b7-5f30-4c6f-a49f-5f8d186a02d4",
+                            "amount": "4478.88",
+                            "category": "electronics",
+                            "subcategory": null,
+                            "transaction_date": "2025-02-02",
+                            "merchant_name": "Croma Store",
+                            "merchant_normalized": "Croma",
+                            "payment_method": "Credit Card"
+                        },
+                        {
+                            "transaction_id": "920fd690-c670-4d20-9844-28e6a43637ed",
+                            "amount": "810.88",
+                            "category": "groceries",
+                            "subcategory": null,
+                            "transaction_date": "2025-01-31",
+                            "merchant_name": "Spencer's Retail",
+                            "merchant_normalized": "Spencer's",
+                            "payment_method": "Cash"
+                        },
+                        {
+                            "transaction_id": "abc0db17-d80b-459a-880e-b825ffc0e18b",
+                            "amount": "2362.50",
+                            "category": "shopping",
+                            "subcategory": null,
+                            "transaction_date": "2025-01-27",
+                            "merchant_name": "Nykaa Store",
+                            "merchant_normalized": "Nykaa",
+                            "payment_method": "Cash"
+                        }
+                    ],
+                    "count": 105,
+                    "query_type": "transactions"
+                },
+                "metadata": {
+                    "query_type": "spending_analysis",
+                    "execution_time": 0.7117197513580322
+                }
+            },
+            "error": "",
+            "execution_time": 4.697934,
+            "retry_attempt": 0
+        },
+        "interpret_comparison": {
+            "step_id": "interpret_comparison",
+            "agent_name": "insight_synthesis_agent",
+            "success": true,
+            "result": {
+                "insights": "I lack the ability to compare your spending this year versus last year because I don't have access to your spending data. Is there anything else you need help with?",
+                "visualization": {
+                    "type": "bar_chart",
+                    "fields": {
+                        "x_axis": [
+                            "This Year",
+                            "Last Year"
+                        ],
+                        "y_axis": [
+                            0,
+                            0
+                        ]
+                    },
+                    "caption": "Spending comparison between this year and last year."
+                },
+                "explanation": "A bar chart is suitable for comparing spending between \"This Year\" and \"Last Year\" because it visually represents the magnitude of each year's spending, making it easy to see the difference between the two."
+            },
+            "error": "",
+            "execution_time": 4.49865,
+            "retry_attempt": 0
+        }
+    },
+    "error_summary": "",
+    "error": null,
+    "query": null
+}

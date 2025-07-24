@@ -389,15 +389,15 @@ async def chat_handler(
     body: dict = Body(...)
 ):
     try:
+        user_query = body['query']
+
+        # # Uncomment this for actual processing
         # orchestrator = MasterOrchestrator(
-        #     project_id=os.getenv("PROJECT_ID"),  # dummy project id
+        #     project_id=os.getenv("PROJECT_ID"),
         #     config_path="config/agent_config.yaml",
         #     location="us-central1",
         #     model_name="gemini-2.0-flash-001"
         # )
-        user_query = body['query']
-
-        # # Provide dummy user_id and optional context
         # result = await orchestrator.process_query(
         #     query=user_query,
         #     user_id="a73ff731-9018-45ed-86ff-214e91baf702",
@@ -408,15 +408,56 @@ async def chat_handler(
         #     }
         # )
 
-        # print("----- Final Orchestrator Response -----")
-        # print(result)
-        # user_message = body.get("message")
-        # if not user_message:
-        #     raise HTTPException(status_code=400, detail="Missing 'message' in body.")
+        # Dummy response for testing with frontend
+        mock_result = {
+            "insights": "In July 2025, you spent a total of $5326.11 on food. A significant portion of your food spending went to Domino's Pizza ($3695.72), Binge Cafe ($3386.1), and Cafe Coffee Day ($2979). It appears you frequently visit these merchants. Consider exploring other dining options for more variety!",
+            "visualization": {
+                "type": "bar_chart",
+                "fields": {
+                    "x_axis": [
+                        "2025-07-01",
+                        "2025-06-01",
+                        "2025-04-01",
+                        "2025-03-01",
+                        "2025-02-01"
+                    ],
+                    "y_axis": [
+                        5668.46,
+                        1905.75,
+                        1125.72,
+                        7942.6,
+                        1575.5
+                    ]
+                },
+                "caption": "The bar chart shows the amount spent on groceries each month."
+            },
+            "explanation": "A bar chart is suitable because it effectively compares the total spending on groceries across different months, visually highlighting the changes in expenditure over time. It clearly presents the monthly grocery expenses for easy comparison."
+        }
 
-        model = GenerativeModel("gemini-2.0-flash-001")
-        chat = model.start_chat()
+#         mock_result = {
+#     "insights": "In July 2025, your food spending was distributed among several key merchants.",
+#     "visualization": {
+#         "type": "pie_chart",
+#         "fields": {
+#             "x_axis": [
+#                 "Domino's Pizza",
+#                 "Binge Cafe",
+#                 "Cafe Coffee Day",
+#                 "Others"
+#             ],
+#             "y_axis": [
+#                 3695.72,
+#                 3386.1,
+#                 2979,
+#                 1123.56
+#             ]
+#         },
+#         "caption": "Pie chart showing the share of food spending by merchant in July 2025."
+#     },
+#     "explanation": "A pie chart is appropriate here as it highlights the proportional distribution of spending among different merchants, making it easy to identify dominant expenses."
+# }
 
+<<<<<<< HEAD
 <<<<<<< HEAD
         # response = chat.send_message(user_message)
 
@@ -425,6 +466,38 @@ async def chat_handler(
         response = chat.send_message(user_query)
         return JSONResponse(content={"reply": response.text} )
 >>>>>>> 52dac17 (Frontend Integration - History, Scan, Chat)
+=======
+#         mock_result = {
+#             "insights": "Your monthly spending on transportation shows a fluctuating pattern across recent months.",
+#             "visualization": {
+#                 "type": "line_chart",
+#                 "fields": {
+#                     "x_axis": [
+#                         "2025-02-01",
+#                         "2025-03-01",
+#                         "2025-04-01",
+#                         "2025-05-01",
+#                         "2025-06-01",
+#                         "2025-07-01"
+#                     ],
+#                     "y_axis": [
+#                         320.5,
+#                         540.0,
+#                         410.2,
+#                         660.75,
+#                         500.3,
+#                         720.4
+#                     ]
+#                 },
+#                 "caption": "Line chart showing monthly transportation expenses over time."
+#             },
+#             "explanation": "A line chart is used here to effectively show the trend of your transportation spending. It helps highlight increases or decreases across months, making patterns easily recognizable."
+# }
+
+
+
+        return JSONResponse(content={"reply": mock_result})
+>>>>>>> 6752978 (Frontend Integration - Chat Charts Setup)
 
     except Exception as e:
         logging.error(f"Chat endpoint error: {e}")
