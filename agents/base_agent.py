@@ -42,7 +42,7 @@ class BaseAgent(ABC):
         VertexAIInitializer.initialize(self.project_id, self.location)
         
         # Initialize shared tools
-        self.user_profile_manager = UserProfileManager()
+        self.user_profile_manager = UserProfileManager(project_id)
         self.error_handler = ErrorHandler(self.logger)
         self.integration_coordinator = IntegrationCoordinator()
         self.db_connector = DatabaseConnector(self.project_id)
