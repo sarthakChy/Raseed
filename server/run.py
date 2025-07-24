@@ -417,9 +417,14 @@ async def chat_handler(
         model = GenerativeModel("gemini-2.0-flash-001")
         chat = model.start_chat()
 
+<<<<<<< HEAD
         # response = chat.send_message(user_message)
 
         return JSONResponse(content=json.loads(result.model_dump_json()))
+=======
+        response = chat.send_message(user_query)
+        return JSONResponse(content={"reply": response.text} )
+>>>>>>> 52dac17 (Frontend Integration - History, Scan, Chat)
 
     except Exception as e:
         logging.error(f"Chat endpoint error: {e}")
