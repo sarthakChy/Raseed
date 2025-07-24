@@ -70,12 +70,19 @@ class QueryFilters(BaseModel):
 
 class AnalysisParameters(BaseModel):
     """Parameters for the requested analysis."""
-    aggregation_level: str = Field(default="monthly")  # Changed from "daily"
+    aggregation_level: str = Field(default="monthly")
     comparison_baseline: Optional[str] = Field(default=None)
     metrics: List[str] = Field(default_factory=list)
     grouping: List[str] = Field(default_factory=list)
     sorting: Optional[str] = Field(default=None)
     limit: Optional[int] = Field(default=None)
+    
+    @validator('aggregation_level', pre=True)
+    def validate_aggregation_level(cls, v):
+        """Ensure aggregation_level is never None."""
+        if v is None or v == "":
+            return "monthly"
+        return v
 
 
 class StructuredQuery(BaseModel):
@@ -180,6 +187,76 @@ class QueryTranslationAgent(BaseAgent):
 
         self.logger.info("Query Translation Agent initialized successfully")
 
+    def _calculate_default_date_range(self, months: int = 6) -> Tuple[str, str]:
+        """
+        Calculate default date range for queries without specific dates.
+        
+        Args:
+            months: Number of months to go back from today
+            
+        Returns:
+            Tuple of (start_date, end_date) in ISO format
+        """
+        today = datetime.now().date()
+        start_date = today - timedelta(days=months * 30)  # Approximate month calculation
+        return start_date.isoformat(), today.isoformat()
+
+    def _parse_relative_time_period(self, query: str, relative_period: str = None) -> Tuple[Optional[str], Optional[str], str]:
+        """
+        Parse relative time periods from query text and return appropriate date range.
+        
+        Args:
+            query: Original query text
+            relative_period: Relative period extracted by LLM
+            
+        Returns:
+            Tuple of (start_date, end_date, period_description)
+        """
+        text_to_analyze = (relative_period or query).lower()
+        today = datetime.now().date()
+        
+        # Enhanced patterns for different time expressions
+        patterns = [
+            # "past X" or "last X" patterns
+            (r'(?:past|last|previous)\s+(\d+)\s*(day|week|month|year)s?', 'past_number'),
+            (r'(?:past|last|previous)\s+(day|week|month|quarter|year)', 'past_single'),
+            # "X ago" patterns  
+            (r'(\d+)\s*(day|week|month|year)s?\s*(?:ago|back)', 'ago_number'),
+            # "in the past X" patterns
+            (r'in\s+the\s+(?:past|last)\s+(\d+)\s*(day|week|month|year)s?', 'in_past_number'),
+            (r'in\s+the\s+(?:past|last)\s+(day|week|month|quarter|year)', 'in_past_single'),
+        ]
+        
+        for pattern, pattern_type in patterns:
+            match = re.search(pattern, text_to_analyze)
+            if match:
+                if 'number' in pattern_type:
+                    value = int(match.group(1))
+                    unit = match.group(2)
+                else:
+                    value = 1
+                    unit = match.group(1)
+                
+                # Calculate start date based on unit
+                if unit in ['day', 'days']:
+                    start_date = today - timedelta(days=value)
+                elif unit in ['week', 'weeks']:
+                    start_date = today - timedelta(weeks=value)
+                elif unit in ['month', 'months']:
+                    start_date = today - timedelta(days=value * 30)
+                elif unit in ['quarter', 'quarters']:
+                    start_date = today - timedelta(days=value * 90)
+                elif unit in ['year', 'years']:
+                    start_date = today - timedelta(days=value * 365)
+                else:
+                    continue
+                
+                period_desc = f"past {value} {unit}{'s' if value > 1 else ''}"
+                return start_date.isoformat(), today.isoformat(), period_desc
+        
+        # If no pattern matched, return None values
+        return None, None, relative_period or "unspecified period"
+
     async def process(self, request: Dict[str, Any]) -> QueryTranslationResult:
         """
         Main processing method for the Query Translation Agent.
@@ -262,153 +339,6 @@ class QueryTranslationAgent(BaseAgent):
                     "original_query": request.get("query", "")
                 }
             )
-
-    async def _parse_query_with_llm(self, query: str, user_context: Dict[str, Any]) -> Optional[StructuredQuery]:
-        try:
-            # Handle empty or None user_context
-            if not user_context:
-                user_context = {}
-
-            context_info = self._build_context_info(user_context)
-            conversation_history = self._get_recent_conversation_context()
-
-            prompt = f"""
-You are a financial query parsing expert. Parse the following natural language query into a structured format.
-
-Context Information:
-{context_info}
-
-Recent Conversation Context:
-{conversation_history}
-
-User Query: "{query}"
-
-Since limited context is available, make reasonable assumptions:
-- Default currency: USD
-- Default timezone: UTC
-- Time references like "last month", "in the past 2 months", or explicit date ranges should be interpreted relative to current date or as custom ranges.
-    - If a relative period (e.g., "past 2 months") is detected, set `time_range.type` to "custom_range" and calculate `start_date` and `end_date`. The `end_date` should be today's date, and `start_date` should be calculated by subtracting the specified period from today's date.
-    - For explicit date ranges (e.g., "between 2024-01-15 and 2025-07-23"), set `time_range.type` to "custom_range" and populate `start_date` and `end_date` directly.
-- Categories should be normalized to common financial categories.
-
-IMPORTANT: Return a complete JSON object matching this exact structure:
-{{
-    "query_type": "spending_analysis",
-    "entities": [
-        {{
-            "entity_type": "category",
-            "value": "groceries",
-            "confidence": 0.9,
-            "original_text": "groceries",
-            "normalized_value": "groceries"
-        }}
-    ],
-    "time_range": {{
-        "type": "last_month",
-        "start_date": null,
-        "end_date": null,
-        "relative_period": "previous month"
-    }},
-    "filters": {{
-        "categories": [],
-        "merchants": [],
-        "amount_min": null,
-        "amount_max": null,
-        "tags": [],
-        "exclude_categories": []
-    }},
-    "analysis_parameters": {{
-        "aggregation_level": "monthly",
-        "comparison_baseline": null,
-        "metrics": [],
-        "grouping": [],
-        "sorting": null,
-        "limit": null
-    }},
-    "context_requirements": [],
-    "original_query": "{query}",
-    "confidence_score": 0.85,
-    "requires_clarification": false,
-    "clarification_questions": []
-}}
-
-Return ONLY the JSON, no other text.
-"""
-            response = await self.model.generate_content_async(
-                prompt,
-                generation_config=self.generation_config
-            )
-
-            # Parse JSON response into StructuredQuery
-            response_text = response.text.strip()
-
-            # Clean up response text (remove markdown formatting if present)
-            if response_text.startswith('```json'):
-                response_text = response_text[7:]
-            if response_text.endswith('```'):
-                response_text = response_text[:-3]
-
-            # Parse JSON
-            parsed_json = json.loads(response_text.strip())
-
-            # --- Start of new logic for handling custom ranges based on relative periods ---
-            # If the LLM identifies a relative period, ensure time_range.type is 'custom_range'
-            # and calculate start/end dates.
-            if parsed_json.get('time_range', {}).get('relative_period'):
-                relative_period = parsed_json['time_range']['relative_period'].lower()
-                today = datetime.now().date()
-                start_date = None
-                end_date = today
-
-                # Simple parsing for "past X [days/weeks/months/years]"
-                match_past_period = re.match(r'past (\d+) (day|week|month|year)s?', relative_period)
-                if match_past_period:
-                    value = int(match_past_period.group(1))
-                    unit = match_past_period.group(2)
-                    if unit == 'day':
-                        start_date = today - timedelta(days=value)
-                    elif unit == 'week':
-                        start_date = today - timedelta(weeks=value)
-                    elif unit == 'month':
-                        # This is a simplification; for exact months, you might need calendar logic
-                        start_date = today - timedelta(days=value * 30)
-                    elif unit == 'year':
-                        start_date = today - timedelta(days=value * 365)
-                    
-                    parsed_json['time_range']['type'] = TimeReference.CUSTOM_RANGE.value
-                    parsed_json['time_range']['start_date'] = start_date.isoformat()
-                    parsed_json['time_range']['end_date'] = end_date.isoformat()
-                    parsed_json['time_range']['relative_period'] = relative_period # Keep original relative period description
-                elif parsed_json['time_range']['type'] != TimeReference.CUSTOM_RANGE.value:
-                    # If it's a relative period but not recognized by our simple regex,
-                    # and it's not already 'custom_range', force it to 'custom_range'
-                    # and leave start/end date for further processing or clarification
-                    parsed_json['time_range']['type'] = TimeReference.CUSTOM_RANGE.value
-                    parsed_json['time_range']['start_date'] = None
-                    parsed_json['time_range']['end_date'] = None
-
-
-            # If the LLM has already provided explicit start_date and end_date,
-            # ensure time_range.type is set to CUSTOM_RANGE if not already.
-            if parsed_json.get('time_range', {}).get('start_date') and \
-               parsed_json.get('time_range', {}).get('end_date') and \
-               parsed_json['time_range']['type'] != TimeReference.CUSTOM_RANGE.value:
-                parsed_json['time_range']['type'] = TimeReference.CUSTOM_RANGE.value
-            # --- End of new logic ---
-
-            # Create StructuredQuery object
-            structured_query = StructuredQuery(**parsed_json)
-
-            self.logger.info(f"Successfully parsed query with confidence: {structured_query.confidence_score}")
-            return structured_query
-
-        except json.JSONDecodeError as e:
-            self.logger.error(f"JSON parsing error: {str(e)}")
-            self.logger.error(f"Response text: {response_text[:500] if 'response_text' in locals() else 'No response'}")
-            return None
-        except Exception as e:
-            self.logger.error(f"Error in LLM query parsing: {str(e)}")
-            return None
 
     async def _assess_query_complexity(self, structured_query: StructuredQuery) -> QueryComplexity:
         """
@@ -514,48 +444,6 @@ Each sub-query should be a complete, executable query on its own.
             self.logger.error(f"Error in query decomposition: {str(e)}")
             return None
 
-    async def _validate_query(self, structured_query: StructuredQuery, complexity: QueryComplexity) -> ValidationResult:
-        """
-        Validate query feasibility and provide suggestions.
-
-        Args:
-            structured_query: Query to validate
-            complexity: Complexity assessment
-
-        Returns:
-            ValidationResult
-        """
-        issues = []
-        suggestions = []
-        required_data = ["transactions"]  # Base requirement
-
-        # Check time range validity
-        if structured_query.time_range.type == TimeReference.CUSTOM_RANGE:
-            if not structured_query.time_range.start_date or not structured_query.time_range.end_date:
-                issues.append("Custom date range specified but dates are missing")
-                suggestions.append("Please provide specific start and end dates")
-
-        # Check for data requirements
-        if structured_query.query_type == QueryType.BUDGET_CHECK:
-            required_data.append("budgets")
-        elif structured_query.query_type == QueryType.GOAL_TRACKING:
-            required_data.append("financial_goals")
-
-        # Confidence-based validation
-        if structured_query.confidence_score < 0.6:
-            issues.append("Query parsing confidence is low")
-            suggestions.append("Consider rephrasing the query for better clarity")
-
-        is_valid = len(issues) == 0
-
-        return ValidationResult(
-            is_valid=is_valid,
-            issues=issues,
-            suggestions=suggestions,
-            required_data=required_data,
-            estimated_complexity=complexity
-        )
-
     async def _update_conversation_context(self, original_query: str, structured_query: StructuredQuery):
         """Update the conversation context with the new query."""
         self.conversation_context.update({
@@ -604,15 +492,257 @@ Each sub-query should be a complete, executable query on its own.
             "conversation_context": self.conversation_context,
             "recent_queries": self.session_queries[-5:] if self.session_queries else []
         }
+    
+    async def _parse_query_with_llm(self, query: str, user_context: Dict[str, Any]) -> Optional[StructuredQuery]:
+        try:
+            # Handle empty or None user_context
+            if not user_context:
+                user_context = {}
+
+            context_info = self._build_context_info(user_context)
+            conversation_history = self._get_recent_conversation_context()
+
+            prompt = f"""
+You are a financial query parsing expert. Parse the following natural language query into a structured format.
+
+Context Information:
+{context_info}
+
+Recent Conversation Context:
+{conversation_history}
+
+User Query: "{query}"
+
+IMPORTANT INSTRUCTIONS FOR TIME PARSING:
+- For queries containing "past year", "last year", set time_range.type to "custom_range" and calculate dates for exactly 1 year ago from today
+- For queries containing "past X months/weeks/days", set time_range.type to "custom_range" and calculate the exact date range
+- For standard references like "last month", "this year", use the appropriate enum value
+- When setting custom_range, ALWAYS provide both start_date and end_date in ISO format (YYYY-MM-DD)
+- Current date context: Today is {datetime.now().date().isoformat()}
+
+Default assumptions for missing context:
+- Default currency: USD
+- Default timezone: UTC
+- Categories should be normalized to common financial categories (food, groceries, dining, transportation, etc.)
+
+IMPORTANT: Return a complete JSON object matching this exact structure:
+{{
+    "query_type": "spending_analysis",
+    "entities": [
+        {{
+            "entity_type": "category",
+            "value": "food",
+            "confidence": 0.9,
+            "original_text": "food",
+            "normalized_value": "food"
+        }}
+    ],
+    "time_range": {{
+        "type": "custom_range",
+        "start_date": "2024-07-24",
+        "end_date": "2025-07-24",
+        "relative_period": "past year"
+    }},
+    "filters": {{
+        "categories": ["food"],
+        "merchants": [],
+        "amount_min": null,
+        "amount_max": null,
+        "tags": [],
+        "exclude_categories": []
+    }},
+    "analysis_parameters": {{
+        "aggregation_level": "monthly",
+        "comparison_baseline": null,
+        "metrics": ["total_amount"],
+        "grouping": ["category"],
+        "sorting": null,
+        "limit": null
+    }},
+    "context_requirements": ["transactions"],
+    "original_query": "{query}",
+    "confidence_score": 0.85,
+    "requires_clarification": false,
+    "clarification_questions": []
+}}
+
+CRITICAL: For time periods like "past year", "last 12 months", etc., you MUST:
+1. Set type to "custom_range"
+2. Calculate exact start_date (1 year ago from today)
+3. Set end_date to today's date
+4. Set relative_period to describe the period
+
+Return ONLY the JSON, no other text.
+"""
+            response = await self.model.generate_content_async(
+                prompt,
+                generation_config=self.generation_config
+            )
+
+            # Parse JSON response into StructuredQuery
+            response_text = response.text.strip()
+
+            # Clean up response text (remove markdown formatting if present)
+            if response_text.startswith('```json'):
+                response_text = response_text[7:]
+            if response_text.endswith('```'):
+                response_text = response_text[:-3]
+
+            # Parse JSON
+            parsed_json = json.loads(response_text.strip())
+
+            # Clean up None values that should have defaults
+            if parsed_json.get('analysis_parameters', {}).get('aggregation_level') is None:
+                parsed_json['analysis_parameters']['aggregation_level'] = 'monthly'
+
+            # Ensure other required fields have defaults if None
+            if not parsed_json.get('entities'):
+                parsed_json['entities'] = []
+            if not parsed_json.get('context_requirements'):
+                parsed_json['context_requirements'] = []
+            if not parsed_json.get('clarification_questions'):
+                parsed_json['clarification_questions'] = []
+
+            # Enhanced post-processing for time ranges
+            time_range = parsed_json.get('time_range', {})
+            
+            # If LLM didn't properly handle the time range, apply our logic
+            if (time_range.get('type') == TimeReference.CUSTOM_RANGE.value and 
+                (not time_range.get('start_date') or not time_range.get('end_date'))):
+                
+                # Try to parse the time range from the original query
+                start_date, end_date, period_desc = self._parse_relative_time_period(
+                    query, time_range.get('relative_period')
+                )
+                
+                if start_date and end_date:
+                    parsed_json['time_range']['start_date'] = start_date
+                    parsed_json['time_range']['end_date'] = end_date
+                    parsed_json['time_range']['relative_period'] = period_desc
+                    self.logger.info(f"Applied parsed time range: {start_date} to {end_date} for '{period_desc}'")
+                else:
+                    # Fall back to default range
+                    self.logger.info("Custom range detected but dates missing, applying default 6-month range")
+                    default_start, default_end = self._calculate_default_date_range(months=6)
+                    parsed_json['time_range']['start_date'] = default_start
+                    parsed_json['time_range']['end_date'] = default_end
+                    parsed_json['time_range']['relative_period'] = "past 6 months (default)"
+
+            # Create StructuredQuery object
+            structured_query = StructuredQuery(**parsed_json)
+
+            self.logger.info(f"Successfully parsed query with confidence: {structured_query.confidence_score}")
+            self.logger.info(f"Time range: {structured_query.time_range.type.value} ({structured_query.time_range.start_date} to {structured_query.time_range.end_date})")
+            return structured_query
+
+        except json.JSONDecodeError as e:
+            self.logger.error(f"JSON parsing error: {str(e)}")
+            self.logger.error(f"Response text: {response_text[:500] if 'response_text' in locals() else 'No response'}")
+            return None
+        except Exception as e:
+            self.logger.error(f"Error in LLM query parsing: {str(e)}")
+            return None
+
+    async def _validate_query(self, structured_query: StructuredQuery, complexity: QueryComplexity) -> ValidationResult:
+        """
+        Validate query feasibility and provide suggestions.
+
+        Args:
+            structured_query: Query to validate
+            complexity: Complexity assessment
+
+        Returns:
+            ValidationResult
+        """
+        issues = []
+        suggestions = []
+        required_data = ["transactions"]  # Base requirement
+
+        # Check time range validity - improved validation for default ranges
+        if structured_query.time_range.type == TimeReference.CUSTOM_RANGE:
+            if not structured_query.time_range.start_date or not structured_query.time_range.end_date:
+                # Only flag as an issue if it's truly missing (not our default case)
+                if (not structured_query.time_range.relative_period or 
+                    "default" not in structured_query.time_range.relative_period.lower()):
+                    issues.append("Custom date range specified but dates are missing")
+                    suggestions.append("Please provide specific start and end dates")
+            else:
+                # Validate date format and logic
+                try:
+                    start = datetime.fromisoformat(structured_query.time_range.start_date)
+                    end = datetime.fromisoformat(structured_query.time_range.end_date)
+                    if start > end:
+                        issues.append("Start date is after end date")
+                        suggestions.append("Please ensure start date is before end date")
+                    
+                    # Check if date range is too large (more than 3 years)
+                    if (end - start).days > 1095:  # 3 years
+                        suggestions.append("Date range is quite large, consider narrowing it for better performance")
+                        
+                except ValueError:
+                    issues.append("Invalid date format in time range")
+                    suggestions.append("Please use ISO format (YYYY-MM-DD) for dates")
+
+        # Check for data requirements based on query type
+        if structured_query.query_type == QueryType.BUDGET_CHECK:
+            required_data.append("budgets")
+        elif structured_query.query_type == QueryType.GOAL_TRACKING:
+            required_data.append("financial_goals")
+        elif structured_query.query_type == QueryType.FORECAST:
+            required_data.append("historical_data")
+            # Check if we have enough historical data for forecasting
+            if structured_query.time_range.type != TimeReference.CUSTOM_RANGE:
+                suggestions.append("Forecasting typically requires specific historical data range")
+
+        # Confidence-based validation
+        if structured_query.confidence_score < 0.6:
+            issues.append("Query parsing confidence is low")
+            suggestions.append("Consider rephrasing the query for better clarity")
+        elif structured_query.confidence_score < 0.8:
+            suggestions.append("Query could be more specific for better results")
+
+        # Check for potential issues with filters
+        if (structured_query.filters.amount_min is not None and 
+            structured_query.filters.amount_max is not None and
+            structured_query.filters.amount_min > structured_query.filters.amount_max):
+            issues.append("Minimum amount is greater than maximum amount")
+            suggestions.append("Please check your amount range filters")
+
+        # Check for conflicting categories
+        if (structured_query.filters.categories and 
+            structured_query.filters.exclude_categories):
+            common_categories = set(structured_query.filters.categories) & set(structured_query.filters.exclude_categories)
+            if common_categories:
+                issues.append(f"Categories appear in both include and exclude filters: {', '.join(common_categories)}")
+                suggestions.append("Remove conflicting categories from either include or exclude filters")
+
+        # Validate entity consistency
+        for entity in structured_query.entities:
+            if entity.confidence < 0.5:
+                suggestions.append(f"Low confidence entity detected: {entity.original_text}")
+
+        # Check if clarification is needed
+        if structured_query.requires_clarification and not structured_query.clarification_questions:
+            issues.append("Query requires clarification but no questions provided")
+
+        is_valid = len(issues) == 0
+
+        return ValidationResult(
+            is_valid=is_valid,
+            issues=issues,
+            suggestions=suggestions,
+            required_data=required_data,
+            estimated_complexity=complexity
+        )
 
 async def main():
     agent = QueryTranslationAgent()
     request = {
-        "query": "How much did I spend on electronics in the past 2 years?", # Changed query
+        "query": "Help me save money on shopping",  # Test query without explicit dates
         "user_context": {
             "timezone": "Asia/Kolkata",
             "currency": "INR",
-            "preferred_categories": ["groceries", "food", "transport", "electronics"] # Added electronics
+            "preferred_categories": ["groceries", "food", "transport", "electronics"]
         },
         "user_id": "a73ff731-9018-45ed-86ff-214e91baf702"
     }
