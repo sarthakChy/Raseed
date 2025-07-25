@@ -193,12 +193,12 @@ class RecommendationEngineAgent(BaseAgent):
                             "user_goals": {
                                 "type": "object",
                                 "description": "User's financial goals and preferences for recommendation targeting",
-                                "optional": True
+                                "nullable": True
                             },
                             "original_query": {
                                 "type": "string", 
                                 "description": "Original user query for context-aware recommendations",
-                                "optional": True
+                                "nullable": True
                             }
                         },
                         "required": ["user_id", "spending_analysis"]

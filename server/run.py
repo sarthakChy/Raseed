@@ -390,16 +390,15 @@ async def chat_handler(
 ):
     try:
         orchestrator = MasterOrchestrator(
-            project_id=os.getenv("PROJECT_ID"),  # dummy project id
+            project_id=os.getenv("PROJECT_ID"),
             config_path="config/agent_config.yaml",
             location="us-central1",
             model_name="gemini-2.0-flash-001"
         )
 
         user_query = body['query']
-        user_id = auth.get("uid")
+        user_id = "eeec0ef0-a809-401a-8b58-32cc58a92671"
 
-        # Provide dummy user_id and optional context
         result = await orchestrator.process_query(
             query=user_query,
             user_id=str(user_id),
@@ -410,35 +409,42 @@ async def chat_handler(
             }
         )
 
-        print("----- Final Orchestrator Response -----")
-        # print(result)
-
-        # user_message = body.get("message")
-        # if not user_message:
-        #     raise HTTPException(status_code=400, detail="Missing 'message' in body.")
-
-        # model = GenerativeModel("gemini-2.0-flash-001")
-        # chat = model.start_chat()
-
-        # response = chat.send_message(user_message)
-
-        # Return only synthesize_insights.result
         full_json = json.loads(result.model_dump_json())
-        print("##################################")
+        step_results = full_json.get("step_results", {})
         print(full_json)
-        print("##################################")
-        synth_result = full_json.get("step_results", {}).get("synthesize_insights", {}).get("result", {})
-        print("##################################")
-        print(synth_result)
-        print("##################################")
-        return JSONResponse(content=synth_result)
+        # Check each possible key in priority order
+        possible_keys = [
+            "synthesize_insights",
+            "generate_insights",
+            "create_action_plan",
+            "interpret_comparison",
+            "create_forecast_report"
+        ]
+
+        selected_result = {}
+        for key in possible_keys:
+            if key in step_results and "result" in step_results[key]:
+                selected_result = step_results[key]["result"]
+                break
+
+        if not selected_result:
+            raise HTTPException(status_code=500, detail="No valid result found in step_results")
+
+        return JSONResponse(content={"reply": selected_result})
 
     except Exception as e:
-        logging.error(f"Chat endpoint error: {e}")
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        print(f"Error in /chat: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
        
 # ============================= Receipt History ===============================================
+
+# from datetime import datetime
+
+def serialize_firestore_datetime(data: dict) -> dict:
+    for key, value in data.items():
+        if isinstance(value, datetime):
+            data[key] = value.isoformat()
+    return data
 
 @app.get("/receipts/user/{user_id}")
 async def get_user_receipts(
@@ -447,7 +453,6 @@ async def get_user_receipts(
     auth=Depends(firebase_auth_required)
 ):
     try:
-        # Fetch receipts for the given user ID
         receipts_ref = db.collection("receiptQueue").where("userId", "==", user_id)
         docs = receipts_ref.stream()
         
@@ -455,7 +460,10 @@ async def get_user_receipts(
         for doc in docs:
             receipt_data = doc.to_dict()
             receipt_data["receiptId"] = doc.id
-            receipts.append(receipt_data)
+
+            # Convert Firestore datetime fields to ISO string
+            serialized = serialize_firestore_datetime(receipt_data)
+            receipts.append(serialized)
 
         return JSONResponse(content={"status": "success", "receipts": receipts}, status_code=200)
 
