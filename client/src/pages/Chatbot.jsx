@@ -1,3 +1,4 @@
+// (imports remain unchanged)
 import React, { useEffect, useRef, useState } from "react";
 import { IoMdAdd } from "react-icons/io";
 import { IoSend } from "react-icons/io5";
@@ -57,111 +58,211 @@ const Chatbot = () => {
 
   const renderChart = (visualization) => {
     const { type, fields, caption } = visualization || {};
-    if (!fields || !fields.x_axis || !fields.y_axis || !fields.x_axis.length || !fields.y_axis.length) return null;
 
-    const baseDataset = {
-      label: caption,
-      data: fields.y_axis,
-      borderColor: "#2563eb",
-      backgroundColor: "#3b82f6",
-      borderWidth: 2,
-    };
+    if (!fields) return null;
 
     const pieColors = [
       "#4285F4", "#EA4335", "#FBBC05", "#34A853",
       "#A142F4", "#00ACC1", "#F4511E", "#C0CA33"
     ];
 
-    const pieDataset = {
-      label: caption,
-      data: fields.y_axis,
-      backgroundColor: pieColors.slice(0, fields.y_axis.length),
-      borderWidth: 1,
-    };
-
     const options = {
       responsive: true,
-      maintainAspectRatio: type === "pie_chart" ? false : true,
+      maintainAspectRatio: false,
       plugins: {
         legend: {
-          display: type === "pie_chart",
+          display: true,
           position: "bottom",
         },
       },
     };
 
     switch (type) {
-      case "bar_chart":
-        return (
-          <div className="h-[210px] mx-auto">
-            <Bar data={{ labels: fields.x_axis, datasets: [baseDataset] }} options={options} />
-          </div>
-        )
-      case "line_chart":
-        return (
-          <div className="h-[210px] mx-auto">
-            <Line data={{ labels: fields.x_axis, datasets: [baseDataset] }} options={options} />
-          </div>
-        )
       case "pie_chart":
+        if (!fields.labels || !fields.values) return null;
         return (
-          <div className="h-[210px] mx-auto">
-            <Pie data={{ labels: fields.x_axis, datasets: [pieDataset] }} options={options} />
+          <div className="h-[210px] mx-auto mt-2">
+            <Pie
+              data={{
+                labels: fields.labels,
+                datasets: [
+                  {
+                    label: caption || "Breakdown",
+                    data: fields.values,
+                    backgroundColor: pieColors.slice(0, fields.labels.length),
+                    borderWidth: 1,
+                  },
+                ],
+              }}
+              options={options}
+            />
           </div>
         );
+
+      case "bar_chart":
+        if (!fields.x_axis || !fields.y_axis) return null;
+        return (
+          <div className="h-[210px] mx-auto mt-2">
+            <Bar
+              data={{
+                labels: fields.x_axis,
+                datasets: [
+                  {
+                    label: caption,
+                    data: fields.y_axis,
+                    borderColor: "#2563eb",
+                    backgroundColor: "#3b82f6",
+                    borderWidth: 2,
+                  },
+                ],
+              }}
+              options={options}
+            />
+          </div>
+        );
+
+      case "line_chart":
+        if (!fields.x_axis || !fields.y_axis) return null;
+        return (
+          <div className="h-[210px] mx-auto mt-2">
+            <Line
+              data={{
+                labels: fields.x_axis,
+                datasets: [
+                  {
+                    label: caption,
+                    data: fields.y_axis,
+                    borderColor: "#2563eb",
+                    backgroundColor: "#3b82f6",
+                    borderWidth: 2,
+                  },
+                ],
+              }}
+              options={options}
+            />
+          </div>
+        );
+
       default:
         return null;
     }
   };
 
+  // const handleSendMessage = async (text) => {
+  //   if (!text.trim()) return;
+
+  //   const updatedChats = [...chats];
+  //   updatedChats[activeChatIndex].messages.push({ sender: "user", text });
+  //   updatedChats[activeChatIndex].messages.push({ sender: "bot", text: "RASEED is thinking…" });
+  //   setChats(updatedChats);
+  //   setInputText("");
+  //   setIsThinking(true);
+
+  //   try {
+  //     const auth = getAuth();
+  //     const user = auth.currentUser;
+  //     if (!user) throw new Error("User not authenticated");
+
+  //     const token = await user.getIdToken();
+
+  //     const response = await fetch(`${BACKEND_URL}/api/chat`, {
+  //       method: "POST",
+  //       headers: {
+  //         "Content-Type": "application/json",
+  //         Authorization: `Bearer ${token}`,
+  //       },
+  //       body: JSON.stringify({ query: text }),
+  //     });
+
+  //     const data = await response.json();
+  //     console.log(data);
+
+  //     updatedChats[activeChatIndex].messages.pop();
+
+  //     const { insights, visualization, explanation } = data.reply || {};
+  //     updatedChats[activeChatIndex].messages.push({
+  //       sender: "bot",
+  //       text: insights,
+  //       visualization,
+  //       explanation,
+  //     });
+  //   } catch (e) {
+  //     console.error("Error sending message:", e);
+  //     updatedChats[activeChatIndex].messages.pop();
+  //     updatedChats[activeChatIndex].messages.push({
+  //       sender: "bot",
+  //       text: "Error getting response from RASEED.",
+  //     });
+  //   } finally {
+  //     setChats([...updatedChats]);
+  //     setIsThinking(false);
+  //   }
+  // };
+
   const handleSendMessage = async (text) => {
-    if (!text.trim()) return;
+  if (!text.trim()) return;
 
-    const updatedChats = [...chats];
-    updatedChats[activeChatIndex].messages.push({ sender: "user", text });
-    updatedChats[activeChatIndex].messages.push({ sender: "bot", text: "RASEED is thinking…" });
-    setChats(updatedChats);
-    setInputText("");
-    setIsThinking(true);
+  const updatedChats = [...chats];
+  updatedChats[activeChatIndex].messages.push({ sender: "user", text });
+  updatedChats[activeChatIndex].messages.push({ sender: "bot", text: "RASEED is thinking…" });
+  setChats(updatedChats);
+  setInputText("");
+  setIsThinking(true);
 
-    try {
-      const auth = getAuth();
-      const user = auth.currentUser;
-      if (!user) throw new Error("User not authenticated");
+  try {
+    const auth = getAuth();
+    const user = auth.currentUser;
+    if (!user) throw new Error("User not authenticated");
 
-      const token = await user.getIdToken();
+    const token = await user.getIdToken();
 
-      const response = await fetch(`${BACKEND_URL}/api/chat`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ query: text }),
-      });
+    const response = await fetch(`${BACKEND_URL}/api/chat`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ query: text }),
+    });
 
-      const data = await response.json();
-      updatedChats[activeChatIndex].messages.pop(); // remove thinking msg
+    if (!response.ok) {
+      throw new Error(`Server error: ${response.status}`);
+    }
 
-      const { insights, visualization, explanation } = data.reply || {};
+    const data = await response.json();
+    console.log("🟡 Raw response from /api/chat:", data);
+
+    updatedChats[activeChatIndex].messages.pop(); // remove thinking...
+
+    if (!data?.reply) {
       updatedChats[activeChatIndex].messages.push({
         sender: "bot",
-        text: insights,
+        text: "Hmm, I didn't receive a valid response from RASEED.",
+      });
+    } else {
+      const { insights, visualization, explanation } = data.reply;
+      console.log("🟢 Parsed reply:", { insights, visualization, explanation });
+
+      updatedChats[activeChatIndex].messages.push({
+        sender: "bot",
+        text: insights || "I couldn’t find specific insights, but let me try again.",
         visualization,
         explanation,
       });
-    } catch (e) {
-      console.error("Error sending message:", e);
-      updatedChats[activeChatIndex].messages.pop();
-      updatedChats[activeChatIndex].messages.push({
-        sender: "bot",
-        text: "Error getting response from RASEED.",
-      });
-    } finally {
-      setChats([...updatedChats]);
-      setIsThinking(false);
     }
-  };
+  } catch (e) {
+    console.error("Error sending message:", e);
+    updatedChats[activeChatIndex].messages.pop();
+    updatedChats[activeChatIndex].messages.push({
+      sender: "bot",
+      text: "Error getting response from RASEED.",
+    });
+  } finally {
+    setChats([...updatedChats]);
+    setIsThinking(false);
+  }
+};
+
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -206,7 +307,6 @@ const Chatbot = () => {
           </button>
         </div>
 
-        {/* Chat list with rename buttons */}
         <div className="flex-1 overflow-y-auto space-y-2">
           {chats.map((chat, index) => (
             <div
@@ -240,7 +340,6 @@ const Chatbot = () => {
           ))}
         </div>
 
-        {/* Footer Quick Links */}
         <hr className="my-4 border-gray-300" />
         <h4 className="text-sm font-medium text-gray-500 mb-2">Quick Links</h4>
         <div className="space-y-3">
@@ -298,7 +397,7 @@ const Chatbot = () => {
           {chats[activeChatIndex]?.messages.map((msg, idx) => (
             <div key={idx} className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"}`}>
               <div className={`px-4 py-2 rounded-lg max-w-xl w-max ${msg.sender === "user" ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-800"}`}>
-                {typeof msg.text === "string" ? <p>{msg.text}</p> : null}
+                {typeof msg.text === "string" && <p>{msg.text}</p>}
                 {msg.visualization && renderChart(msg.visualization)}
                 {msg.visualization?.caption && <p className="mt-2 text-sm text-gray-600 font-medium">{msg.visualization.caption}</p>}
                 {msg.explanation && <p className="mt-1 text-xs text-gray-500 italic">{msg.explanation}</p>}

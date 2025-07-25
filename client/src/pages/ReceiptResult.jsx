@@ -7,23 +7,52 @@ const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
 const ReceiptResult = () => {
   const navigate = useNavigate();
-  const { imagePreview, analysisStatus, analysisResult } = useLocation().state || {};
+  const location = useLocation();
   const { user } = useAuth();
 
-  const [walletStatus, setWalletStatus] = useState("idle"); // idle | adding | success | error
+  const [imagePreview, setImagePreview] = useState(null);
+  const [analysisStatus, setAnalysisStatus] = useState("processing");
+  const [analysisResult, setAnalysisResult] = useState(null);
+  const [walletStatus, setWalletStatus] = useState("idle");
   const [dotCount, setDotCount] = useState(1);
 
   useEffect(() => {
-    if (walletStatus === "adding") {
-      const interval = setInterval(() => {
-        setDotCount((prev) => (prev % 3) + 1);
-      }, 500);
-      return () => clearInterval(interval);
+    const file = location.state?.file;
+    if (!file) {
+      navigate("/scanreceipts");
+      return;
     }
-  }, [walletStatus]);
 
-  const toTitleCase = (str) =>
-    str ? str.charAt(0).toUpperCase() + str.slice(1).toLowerCase() : "N/A";
+    const previewUrl = URL.createObjectURL(file);
+    setImagePreview(previewUrl);
+
+    const analyzeReceipt = async () => {
+      try {
+        const token = await user.getIdToken();
+        const formData = new FormData();
+        formData.append("file", file);
+
+        const res = await fetch(`${BACKEND_URL}/api/receipts/analyze`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData,
+        });
+
+        const data = await res.json();
+        if (res.ok && data) {
+          setAnalysisResult(data);
+          setAnalysisStatus("success");
+        } else {
+          setAnalysisStatus("error");
+        }
+      } catch (err) {
+        console.error("Upload error:", err);
+        setAnalysisStatus("error");
+      }
+    };
+
+    analyzeReceipt();
+  }, []);
 
   const handleAddToWallet = async () => {
     setWalletStatus("adding");
@@ -54,9 +83,21 @@ const ReceiptResult = () => {
     }
   };
 
+  const toTitleCase = (str) =>
+    str ? str.charAt(0).toUpperCase() + str.slice(1).toLowerCase() : "N/A";
+
   const handleReset = () => {
-    navigate("/scanreceipt");
+    navigate("/scanreceipts");
   };
+
+  useEffect(() => {
+    if (walletStatus === "adding") {
+      const interval = setInterval(() => {
+        setDotCount((prev) => (prev % 3) + 1);
+      }, 500);
+      return () => clearInterval(interval);
+    }
+  }, [walletStatus]);
 
   return (
     <div className="bg-gray-50 min-h-screen p-4">
@@ -68,11 +109,13 @@ const ReceiptResult = () => {
       </button>
 
       <div className="bg-white p-8 sm:p-12 rounded-2xl border border-gray-200 shadow-lg text-center max-w-4xl w-full mx-auto">
-        <img
-          src={imagePreview}
-          alt="Selected"
-          className="max-w-md rounded-xl shadow-md mb-6"
-        />
+        {imagePreview && (
+          <img
+            src={imagePreview}
+            alt="Selected"
+            className="max-w-md rounded-xl shadow-md mb-6"
+          />
+        )}
 
         {walletStatus === "adding" && (
           <p className="text-blue-600 font-semibold mb-4">
@@ -92,9 +135,7 @@ const ReceiptResult = () => {
 
         {analysisStatus === "success" && analysisResult?.ocrData?.extractedData ? (
           <div className="w-full bg-gray-100 rounded-xl p-6 text-left mb-4 shadow">
-            <h3 className="text-xl font-bold mb-4 text-gray-800">
-              Extracted Receipt Details
-            </h3>
+            <h3 className="text-xl font-bold mb-4 text-gray-800">Extracted Receipt Details</h3>
             <ul className="space-y-2 text-gray-700">
               <li><strong>Merchant:</strong> {analysisResult.ocrData.extractedData.merchantName || "N/A"}</li>
               <li><strong>Date:</strong> {analysisResult.ocrData.extractedData.date || "N/A"}</li>
@@ -118,6 +159,8 @@ const ReceiptResult = () => {
               </li>
             </ul>
           </div>
+        ) : analysisStatus === "processing" ? (
+          <p className="text-blue-500 font-semibold">Analyzing receipt…</p>
         ) : (
           <p className="text-red-600 font-semibold mb-4">Error analyzing receipt.</p>
         )}

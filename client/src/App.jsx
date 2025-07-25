@@ -32,7 +32,6 @@ export default function App() {
               {/* Public Routes */}
               <Route path="/" element={<Hero />} />
               <Route path="/about" element={<About />} />
-              <Route path="/getstarted" element={<GetStarted />} />
               <Route path="/upgrade" element={<Upgrade />} />
               <Route path="/faq" element={<FAQs />} />
               <Route path="/contact" element={<Contact />} />
@@ -63,6 +62,12 @@ export default function App() {
               <Route path="/receipt-result" element={
                 <PrivateRoute>
                   <ReceiptResult />
+                </PrivateRoute>
+              } />
+
+              <Route path="/getstarted" element={
+                <PrivateRoute>
+                  <GetStarted />
                 </PrivateRoute>
               } />
             </Routes>
