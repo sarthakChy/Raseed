@@ -536,6 +536,18 @@ IMPORTANT INSTRUCTIONS FOR TIME PARSING:
 - When setting custom_range, ALWAYS provide both start_date and end_date in ISO format (YYYY-MM-DD)
 - Current date context: Today is {datetime.now().date().isoformat()}
 
+VALID QUERY TYPES (use EXACTLY these values):
+- "spending_analysis" - for analyzing spending patterns, amounts, totals
+- "trend_analysis" - for trends over time, growth, changes
+- "comparison" - for comparing periods, categories, merchants
+- "budget_check" - for budget-related queries, budget vs actual, budget status
+- "category_breakdown" - for category-wise analysis
+- "merchant_analysis" - for merchant-specific analysis  
+- "anomaly_detection" - for unusual spending detection
+- "forecast" - for future predictions
+- "goal_tracking" - for financial goal progress
+- "general_inquiry" - for general questions
+
 Default assumptions for missing context:
 - Default currency: USD
 - Default timezone: UTC
@@ -543,24 +555,24 @@ Default assumptions for missing context:
 
 IMPORTANT: Return a complete JSON object matching this exact structure:
 {{
-    "query_type": "spending_analysis",
+    "query_type": "budget_check",
     "entities": [
         {{
-            "entity_type": "category",
-            "value": "food",
+            "entity_type": "budget",
+            "value": "monthly_budget",
             "confidence": 0.9,
-            "original_text": "food",
-            "normalized_value": "food"
+            "original_text": "budget",
+            "normalized_value": "monthly_budget"
         }}
     ],
     "time_range": {{
-        "type": "custom_range",
-        "start_date": "2024-07-24",
-        "end_date": "2025-07-24",
-        "relative_period": "past year"
+        "type": "this_month",
+        "start_date": null,
+        "end_date": null,
+        "relative_period": "this month"
     }},
     "filters": {{
-        "categories": ["food"],
+        "categories": [],
         "merchants": [],
         "amount_min": null,
         "amount_max": null,
@@ -569,24 +581,27 @@ IMPORTANT: Return a complete JSON object matching this exact structure:
     }},
     "analysis_parameters": {{
         "aggregation_level": "monthly",
-        "comparison_baseline": null,
-        "metrics": ["total_amount"],
-        "grouping": ["category"],
+        "comparison_baseline": "budget",
+        "metrics": ["total_amount", "budget_remaining"],
+        "grouping": [],
         "sorting": null,
         "limit": null
     }},
-    "context_requirements": ["transactions"],
+    "context_requirements": ["transactions", "budgets"],
     "original_query": "{query}",
     "confidence_score": 0.85,
     "requires_clarification": false,
     "clarification_questions": []
 }}
 
-CRITICAL: For time periods like "past year", "last 12 months", etc., you MUST:
-1. Set type to "custom_range"
-2. Calculate exact start_date (1 year ago from today)
-3. Set end_date to today's date
-4. Set relative_period to describe the period
+CRITICAL: 
+1. Use ONLY the exact query_type values listed above
+2. For budget-related queries, use "budget_check" (NOT "budget_analysis")
+3. For time periods like "past year", "last 12 months", etc., you MUST:
+   - Set type to "custom_range"
+   - Calculate exact start_date (1 year ago from today)
+   - Set end_date to today's date
+   - Set relative_period to describe the period
 
 Return ONLY the JSON, no other text.
 """
@@ -606,6 +621,21 @@ Return ONLY the JSON, no other text.
 
             # Parse JSON
             parsed_json = json.loads(response_text.strip())
+
+            # POST-PROCESSING: Fix common LLM mistakes with query_type
+            query_type_mapping = {
+                "budget_analysis": "budget_check",
+                "spending_breakdown": "category_breakdown",
+                "expense_analysis": "spending_analysis",
+                "transaction_analysis": "spending_analysis",
+                "financial_analysis": "spending_analysis",
+                "cost_analysis": "spending_analysis"
+            }
+            
+            current_query_type = parsed_json.get('query_type')
+            if current_query_type in query_type_mapping:
+                self.logger.info(f"Mapping query_type from '{current_query_type}' to '{query_type_mapping[current_query_type]}'")
+                parsed_json['query_type'] = query_type_mapping[current_query_type]
 
             # Clean up None values that should have defaults
             if parsed_json.get('analysis_parameters', {}).get('aggregation_level') is None:
