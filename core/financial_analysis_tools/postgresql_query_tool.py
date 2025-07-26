@@ -8,6 +8,7 @@ import json
 from decimal import Decimal
 import pandas as pd
 from google.cloud import secretmanager
+from utils.database_connector import DatabaseConnector
 
 
 class PostgreSQLQueryTool:
@@ -18,43 +19,17 @@ class PostgreSQLQueryTool:
     ):
         self.logger = logger or logging.getLogger(__name__)
         self.project_id = project_id
-        self.connection_pool: Optional[asyncpg.Pool] = None
-        self.secret_client = secretmanager.SecretManagerServiceClient()
 
-
-        secret_name = f"projects/{self.project_id}/secrets/postgres-config/versions/latest"
-        response = self.secret_client.access_secret_version(request={"name": secret_name})
-        secret_data = json.loads(response.payload.data.decode("UTF-8"))
-
-        self.db_config = {
-            'host': secret_data["host"],
-            'port': secret_data.get("port", 5432),
-            'database': secret_data["database"],
-            'user': secret_data["user"],
-            'password': secret_data["password"],
-            'min_size': 5,
-            'max_size': 20,
-            'command_timeout': 60
-        }
-
-        self.query_templates = self._initialize_query_templates()
+        self._db_manager: Optional[DatabaseConnector] = None
         
-    async def initialize_connection_pool(self):
-        """Initialize the database connection pool."""
-        try:
-            if not self.connection_pool:
-                self.connection_pool = await asyncpg.create_pool(**self.db_config)
-                self.logger.info("PostgreSQL connection pool initialized successfully")
-        except Exception as e:
-            self.logger.error(f"Failed to initialize connection pool: {e}")
-            raise
-    
-    async def close_connection_pool(self):
-        """Close the database connection pool."""
-        if self.connection_pool:
-            await self.connection_pool.close()
-            self.connection_pool = None
-            self.logger.info("PostgreSQL connection pool closed")
+        # Initialize query templates
+        self.query_templates = self._initialize_query_templates()
+
+    async def _get_db_manager(self) -> DatabaseConnector:
+        """Get the database manager instance."""
+        if self._db_manager is None:
+            self._db_manager = await DatabaseConnector.get_instance(self.project_id)
+        return self._db_manager
     
     def _initialize_query_templates(self) -> Dict[str, str]:
         """Initialize query templates for different analysis types."""
@@ -78,7 +53,7 @@ class PostgreSQLQueryTool:
                 {category_filter}
                 {amount_filter}
                 ORDER BY t.transaction_date DESC
-                LIMIT $2
+                LIMIT ${limit_param_idx}
             """,
             
             # Category aggregations with time series
@@ -368,7 +343,7 @@ class PostgreSQLQueryTool:
         Returns (filter_clause_string, parameters_list, next_param_index)."""
         all_filter_parts = []
         params = []
-        param_count = initial_param_idx # Start parameter indexing from here
+        param_count = initial_param_idx
 
         if not filters:
             return "", [], initial_param_idx
@@ -376,13 +351,11 @@ class PostgreSQLQueryTool:
         if 'date_range' in filters and filters['date_range']:
             date_range = filters['date_range']
             if 'start_date' in date_range:
-                # Convert date string to datetime.date object
                 start_date_obj = datetime.strptime(date_range['start_date'], '%Y-%m-%d').date()
                 all_filter_parts.append(f"t.transaction_date >= ${param_count}")
                 params.append(start_date_obj)
                 param_count += 1
             if 'end_date' in date_range:
-                # Convert date string to datetime.date object
                 end_date_obj = datetime.strptime(date_range['end_date'], '%Y-%m-%d').date()
                 all_filter_parts.append(f"t.transaction_date <= ${param_count}")
                 params.append(end_date_obj)
@@ -415,7 +388,6 @@ class PostgreSQLQueryTool:
                 param_count += 1
         
         filter_clause_string = " AND " + " AND ".join(all_filter_parts) if all_filter_parts else ""
-        # FIXED: Return the tuple correctly - the current code returns 3 values, but some callers expect only 2
         return filter_clause_string, params, param_count
     
     async def execute_query(
@@ -429,8 +401,6 @@ class PostgreSQLQueryTool:
         **kwargs
     ) -> Dict[str, Any]:
         try:
-            await self.initialize_connection_pool()
-            
             self.logger.info(f"Executing query type: {query_type}, user_id: {user_id}, filters: {filters}, kwargs: {kwargs}")
             
             if user_id is None and query_type != "custom":
@@ -483,59 +453,57 @@ class PostgreSQLQueryTool:
         limit: int = 100,
         **kwargs
     ) -> Dict[str, Any]:
+        """Execute basic transactions query with proper parameter handling."""
         filters = filters or {}
         
-        # user_id is $1. So filters and the LIMIT clause start from $2.
-        # This will correctly build the filter clause with parameters starting from $2
+        # Build filter clause and parameters
         filter_clause, filter_params, next_param_idx = self._build_filters(filters, initial_param_idx=2)
-
-        # The LIMIT parameter will be the very next parameter after all filters.
-        limit_param_idx = next_param_idx
-
-        base_query_template_parts = self.query_templates['transactions_basic'].split('LIMIT $2')
-        query_before_limit = base_query_template_parts[0].strip()
-
-        base_query_parts = self.query_templates['transactions_basic'].split('{date_filter}')
-        select_from_where_fixed = base_query_parts[0] # Contains up to AND t.deleted_at IS NULL
-
-        # Get filter clauses and their parameters
-        # `initial_param_idx=2` because user_id is $1.
-        filter_clause, filter_params, next_param_idx_after_filters = self._build_filters(filters, initial_param_idx=2)
-
-        # The LIMIT parameter will be the next one after all filter parameters.
-        limit_param_index = next_param_idx_after_filters
-
-        # Construct the final query string.
-        # It's crucial that the `filter_clause` is inserted correctly, and `LIMIT` is at the correct index.
-        final_query = f"""
-            {select_from_where_fixed.strip()}
-            {filter_clause.strip()}
+        
+        # Build the final query with proper parameter indexing
+        base_query = """
+            SELECT 
+                t.transaction_id,
+                t.amount,
+                t.category,
+                t.subcategory,
+                t.transaction_date,
+                m.name as merchant_name,
+                m.normalized_name as merchant_normalized,
+                t.payment_method
+            FROM transactions t
+            LEFT JOIN merchants m ON t.merchant_id = m.merchant_id
+            WHERE t.user_id = $1 
+            AND t.deleted_at IS NULL
+            {filter_clause}
             ORDER BY t.transaction_date DESC
-            LIMIT ${limit_param_index}
-        """
-
-        # Assemble all parameters: user_id ($1), then filter parameters, then limit.
+            LIMIT ${limit_param_idx}
+        """.format(
+            filter_clause=filter_clause,
+            limit_param_idx=next_param_idx
+        )
+        
+        # Assemble all parameters
         params = [user_id] + filter_params + [limit]
-
-        self.logger.info(f"Executing transactions query: {final_query}")
+        
+        self.logger.info(f"Executing transactions query: {base_query}")
         self.logger.info(f"Parameters: {params}")
 
-        if user_id is None:
-            self.logger.error("No valid user_id provided")
+        try:
+            db_manager = await self._get_db_manager()
+            async with db_manager.get_connection() as conn:
+                rows = await conn.fetch(base_query, *params)
+
+                return {
+                    "success": True,
+                    "data": [dict(row) for row in rows],
+                    "count": len(rows),
+                    "query_type": "transactions"
+                }
+        except Exception as e:
+            self.logger.error(f"Transaction query failed: {e}")
             return {
                 "success": False,
-                "error": "No valid user_id provided",
-                "query_type": "transactions"
-            }
-
-        async with self.connection_pool.acquire() as conn:
-            # When executing, make sure the number of parameters matches the placeholders.
-            rows = await conn.fetch(final_query, *params)
-
-            return {
-                "success": True,
-                "data": [dict(row) for row in rows],
-                "count": len(rows),
+                "error": str(e),
                 "query_type": "transactions"
             }
     
@@ -552,22 +520,32 @@ class PostgreSQLQueryTool:
         filters = filters or {}
         filter_clause, filter_params, _ = self._build_filters(filters, initial_param_idx=2)
         
+        # Format the query template
         query = self.query_templates['category_aggregations'].format(
             time_period=time_period,
-            date_filter=filter_clause.replace('AND t.transaction_date', 'AND t.transaction_date') if 'date_range' in str(filter_clause) else '',
-            category_filter=filter_clause.replace('AND t.category', 'AND t.category') if 'categories' in str(filter_clause) else ''
+            date_filter=filter_clause,
+            category_filter=""  # Category filter already included in main filter_clause
         )
         
         params = [user_id] + filter_params
         
-        async with self.connection_pool.acquire() as conn:
-            rows = await conn.fetch(query, *params)
-            
+        try:
+            db_manager = await self._get_db_manager()
+            async with db_manager.get_connection() as conn:
+                rows = await conn.fetch(query, *params)
+                
+                return {
+                    "success": True,
+                    "data": [dict(row) for row in rows],
+                    "aggregation_type": aggregation,
+                    "time_period": time_period,
+                    "query_type": "aggregations"
+                }
+        except Exception as e:
+            self.logger.error(f"Aggregations query failed: {e}")
             return {
-                "success": True,
-                "data": [dict(row) for row in rows],
-                "aggregation_type": aggregation,
-                "time_period": time_period,
+                "success": False,
+                "error": str(e),
                 "query_type": "aggregations"
             }
     
@@ -582,18 +560,27 @@ class PostgreSQLQueryTool:
         filter_clause, filter_params, _ = self._build_filters(filters, initial_param_idx=2)
         
         query = self.query_templates['time_series_trends'].format(
-            date_filter=filter_clause.replace('AND t.transaction_date', 'AND t.transaction_date') if 'date_range' in str(filter_clause) else '',
-            category_filter=filter_clause.replace('AND t.category', 'AND t.category') if 'categories' in str(filter_clause) else ''
+            date_filter=filter_clause,
+            category_filter=""  # Category filter already included in main filter_clause
         )
         
         params = [user_id] + filter_params
         
-        async with self.connection_pool.acquire() as conn:
-            rows = await conn.fetch(query, *params)
-            
+        try:
+            db_manager = await self._get_db_manager()
+            async with db_manager.get_connection() as conn:
+                rows = await conn.fetch(query, *params)
+                
+                return {
+                    "success": True,
+                    "data": [dict(row) for row in rows],
+                    "query_type": "trends"
+                }
+        except Exception as e:
+            self.logger.error(f"Trends query failed: {e}")
             return {
-                "success": True,
-                "data": [dict(row) for row in rows],
+                "success": False,
+                "error": str(e),
                 "query_type": "trends"
             }
 
@@ -610,25 +597,34 @@ class PostgreSQLQueryTool:
         
         if comparison_type == "merchant":
             query = self.query_templates['merchant_analysis'].format(
-                date_filter=filter_clause.replace('AND t.transaction_date', 'AND t.transaction_date') if 'date_range' in str(filter_clause) else ''
+                date_filter=filter_clause
             )
         else:
             # Default to category comparison
             query = self.query_templates['category_aggregations'].format(
                 time_period='month',
-                date_filter=filter_clause.replace('AND t.transaction_date', 'AND t.transaction_date') if 'date_range' in str(filter_clause) else '',
+                date_filter=filter_clause,
                 category_filter=''
             )
         
         params = [user_id] + filter_params
         
-        async with self.connection_pool.acquire() as conn:
-            rows = await conn.fetch(query, *params)
-            
+        try:
+            db_manager = await self._get_db_manager()
+            async with db_manager.get_connection() as conn:
+                rows = await conn.fetch(query, *params)
+                
+                return {
+                    "success": True,
+                    "data": [dict(row) for row in rows],
+                    "comparison_type": comparison_type,
+                    "query_type": "comparisons"
+                }
+        except Exception as e:
+            self.logger.error(f"Comparisons query failed: {e}")
             return {
-                "success": True,
-                "data": [dict(row) for row in rows],
-                "comparison_type": comparison_type,
+                "success": False,
+                "error": str(e),
                 "query_type": "comparisons"
             }
 
@@ -643,17 +639,26 @@ class PostgreSQLQueryTool:
         filter_clause, filter_params, _ = self._build_filters(filters, initial_param_idx=2)
         
         query = self.query_templates['spending_patterns'].format(
-            date_filter=filter_clause.replace('AND t.transaction_date', 'AND t.transaction_date') if 'date_range' in str(filter_clause) else ''
+            date_filter=filter_clause
         )
         
         params = [user_id] + filter_params
         
-        async with self.connection_pool.acquire() as conn:
-            rows = await conn.fetch(query, *params)
-            
+        try:
+            db_manager = await self._get_db_manager()
+            async with db_manager.get_connection() as conn:
+                rows = await conn.fetch(query, *params)
+                
+                return {
+                    "success": True,
+                    "data": [dict(row) for row in rows],
+                    "query_type": "patterns"
+                }
+        except Exception as e:
+            self.logger.error(f"Patterns query failed: {e}")
             return {
-                "success": True,
-                "data": [dict(row) for row in rows],
+                "success": False,
+                "error": str(e),
                 "query_type": "patterns"
             }
     
@@ -670,33 +675,51 @@ class PostgreSQLQueryTool:
             recent_days=recent_days
         )
         
-        async with self.connection_pool.acquire() as conn:
-            rows = await conn.fetch(query, user_id)
-            
+        try:
+            db_manager = await self._get_db_manager()
+            async with db_manager.get_connection() as conn:
+                rows = await conn.fetch(query, user_id)
+                
+                return {
+                    "success": True,
+                    "data": [dict(row) for row in rows],
+                    "lookback_days": lookback_days,
+                    "recent_days": recent_days,
+                    "query_type": "anomalies"
+                }
+        except Exception as e:
+            self.logger.error(f"Anomaly detection query failed: {e}")
             return {
-                "success": True,
-                "data": [dict(row) for row in rows],
-                "lookback_days": lookback_days,
-                "recent_days": recent_days,
+                "success": False,
+                "error": str(e),
                 "query_type": "anomalies"
             }
     
     async def _execute_budget_analysis(
         self,
         user_id: str,
-        period: str = "monthly",
+        period: str = "month",
         **kwargs
     ) -> Dict[str, Any]:
         """Execute budget vs actual spending analysis."""
         query = self.query_templates['budget_analysis'].format(period=period)
         
-        async with self.connection_pool.acquire() as conn:
-            rows = await conn.fetch(query, user_id)
-            
+        try:
+            db_manager = await self._get_db_manager()
+            async with db_manager.get_connection() as conn:
+                rows = await conn.fetch(query, user_id)
+                
+                return {
+                    "success": True,
+                    "data": [dict(row) for row in rows],
+                    "period": period,
+                    "query_type": "budget_analysis"
+                }
+        except Exception as e:
+            self.logger.error(f"Budget analysis query failed: {e}")
             return {
-                "success": True,
-                "data": [dict(row) for row in rows],
-                "period": period,
+                "success": False,
+                "error": str(e),
                 "query_type": "budget_analysis"
             }
     
@@ -704,12 +727,21 @@ class PostgreSQLQueryTool:
         """Execute financial goal progress analysis."""
         query = self.query_templates['goal_progress']
         
-        async with self.connection_pool.acquire() as conn:
-            rows = await conn.fetch(query, user_id)
-            
+        try:
+            db_manager = await self._get_db_manager()
+            async with db_manager.get_connection() as conn:
+                rows = await conn.fetch(query, user_id)
+                
+                return {
+                    "success": True,
+                    "data": [dict(row) for row in rows],
+                    "query_type": "goal_progress"
+                }
+        except Exception as e:
+            self.logger.error(f"Goal progress query failed: {e}")
             return {
-                "success": True,
-                "data": [dict(row) for row in rows],
+                "success": False,
+                "error": str(e),
                 "query_type": "goal_progress"
             }
     
@@ -727,12 +759,21 @@ class PostgreSQLQueryTool:
         if not sql_lower.startswith('select'):
             raise ValueError("Only SELECT queries are allowed for custom queries")
         
-        async with self.connection_pool.acquire() as conn:
-            rows = await conn.fetch(sql_query)
-            
+        try:
+            db_manager = await self._get_db_manager()
+            async with db_manager.get_connection() as conn:
+                rows = await conn.fetch(sql_query)
+                
+                return {
+                    "success": True,
+                    "data": [dict(row) for row in rows],
+                    "query_type": "custom"
+                }
+        except Exception as e:
+            self.logger.error(f"Custom query failed: {e}")
             return {
-                "success": True,
-                "data": [dict(row) for row in rows],
+                "success": False,
+                "error": str(e),
                 "query_type": "custom"
             }
     
@@ -742,10 +783,10 @@ class PostgreSQLQueryTool:
             # Execute multiple queries in parallel for comprehensive summary
             tasks = [
                 self.execute_query("aggregations", user_id=user_id, 
-                                 filters={"date_range": {"start_date": (datetime.now() - timedelta(days=days)).date()}},
+                                 filters={"date_range": {"start_date": (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')}},
                                  aggregation="sum", group_by=["category"]),
                 self.execute_query("trends", user_id=user_id,
-                                 filters={"date_range": {"start_date": (datetime.now() - timedelta(days=days)).date()}}),
+                                 filters={"date_range": {"start_date": (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')}}),
                 self.execute_query("budget_analysis", user_id=user_id),
                 self.execute_query("goal_progress", user_id=user_id),
                 self.execute_query("anomalies", user_id=user_id, recent_days=7, lookback_days=30)
@@ -773,10 +814,141 @@ class PostgreSQLQueryTool:
                 "error": str(e)
             }
     
+    # Utility methods for common operations
+    async def get_transaction_count(self, user_id: str, filters: Dict[str, Any] = None) -> int:
+        """Get count of transactions matching filters."""
+        try:
+            filters = filters or {}
+            filter_clause, filter_params, _ = self._build_filters(filters, initial_param_idx=2)
+            
+            query = f"""
+                SELECT COUNT(*) as count
+                FROM transactions t
+                WHERE t.user_id = $1 
+                AND t.deleted_at IS NULL
+                {filter_clause}
+            """
+            
+            params = [user_id] + filter_params
+            
+            db_manager = await self._get_db_manager()
+            async with db_manager.get_connection() as conn:
+                result = await conn.fetchval(query, *params)
+                return result or 0
+                
+        except Exception as e:
+            self.logger.error(f"Failed to get transaction count: {e}")
+            return 0
+    
+    async def get_spending_total(self, user_id: str, filters: Dict[str, Any] = None) -> float:
+        """Get total spending amount matching filters."""
+        try:
+            filters = filters or {}
+            filter_clause, filter_params, _ = self._build_filters(filters, initial_param_idx=2)
+            
+            query = f"""
+                SELECT COALESCE(SUM(t.amount), 0) as total
+                FROM transactions t
+                WHERE t.user_id = $1 
+                AND t.deleted_at IS NULL
+                {filter_clause}
+            """
+            
+            params = [user_id] + filter_params
+            
+            db_manager = await self._get_db_manager()
+            async with db_manager.get_connection() as conn:
+                result = await conn.fetchval(query, *params)
+                return float(result) if result else 0.0
+                
+        except Exception as e:
+            self.logger.error(f"Failed to get spending total: {e}")
+            return 0.0
+    
+    async def get_categories(self, user_id: str = None) -> List[str]:
+        """Get list of all categories (optionally filtered by user)."""
+        try:
+            if user_id:
+                query = """
+                    SELECT DISTINCT t.category
+                    FROM transactions t
+                    WHERE t.user_id = $1 
+                    AND t.deleted_at IS NULL
+                    AND t.category IS NOT NULL
+                    ORDER BY t.category
+                """
+                params = [user_id]
+            else:
+                query = """
+                    SELECT DISTINCT category
+                    FROM transactions
+                    WHERE deleted_at IS NULL
+                    AND category IS NOT NULL
+                    ORDER BY category
+                """
+                params = []
+            
+            db_manager = await self._get_db_manager()
+            async with db_manager.get_connection() as conn:
+                rows = await conn.fetch(query, *params)
+                return [row['category'] for row in rows]
+                
+        except Exception as e:
+            self.logger.error(f"Failed to get categories: {e}")
+            return []
+    
+    async def get_merchants(self, user_id: str = None, category: str = None) -> List[Dict[str, Any]]:
+        """Get list of merchants (optionally filtered by user and category)."""
+        try:
+            conditions = ["m.name IS NOT NULL"]
+            params = []
+            param_idx = 1
+            
+            if user_id:
+                conditions.append(f"EXISTS (SELECT 1 FROM transactions t WHERE t.merchant_id = m.merchant_id AND t.user_id = ${param_idx} AND t.deleted_at IS NULL)")
+                params.append(user_id)
+                param_idx += 1
+            
+            if category:
+                conditions.append(f"m.category = ${param_idx}")
+                params.append(category)
+                param_idx += 1
+            
+            where_clause = " AND ".join(conditions)
+            
+            query = f"""
+                SELECT 
+                    m.merchant_id,
+                    m.name,
+                    m.normalized_name,
+                    m.category,
+                    m.subcategory,
+                    m.merchant_type
+                FROM merchants m
+                WHERE {where_clause}
+                ORDER BY m.name
+                LIMIT 100
+            """
+            
+            db_manager = await self._get_db_manager()
+            async with db_manager.get_connection() as conn:
+                rows = await conn.fetch(query, *params)
+                return [dict(row) for row in rows]
+                
+        except Exception as e:
+            self.logger.error(f"Failed to get merchants: {e}")
+            return []
+    
+    async def close(self):
+        """Close database connections."""
+        if self._db_manager:
+            await self._db_manager.close()
+    
     def __del__(self):
-        """Cleanup connection pool on object destruction."""
-        if self.connection_pool:
-            try:
-                asyncio.create_task(self.close_connection_pool())
-            except:
-                pass
+        """Cleanup on object destruction."""
+        try:
+            if self._db_manager and hasattr(self._db_manager, 'connection_pool') and self._db_manager.connection_pool:
+                # Note: We can't await in __del__, so we just log a warning
+                self.logger.warning("PostgreSQLQueryTool destroyed without proper cleanup. Call close() explicitly.")
+        except:
+            pass

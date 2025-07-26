@@ -9,12 +9,9 @@ import vertexai
 from vertexai.language_models import TextEmbeddingModel
 from google.cloud import aiplatform
 from google.cloud import secretmanager
-
+from utils.database_connector import DatabaseConnector
 
 import asyncpg
-import vertexai
-from vertexai.language_models import TextEmbeddingModel
-import json
 
 class VectorSearchTool:
     """
@@ -34,7 +31,6 @@ class VectorSearchTool:
         
         Args:
             project_id: Google Cloud project ID
-            secret_client: Google Secret Manager client
             location: Vertex AI location
             logger: Logger instance
         """
@@ -52,49 +48,13 @@ class VectorSearchTool:
         self.default_similarity_threshold = 0.7
         self.max_search_results = 50
 
-        # Load DB credentials and setup connection pool
-        self.connection_pool = None
-        self.db_config = self._load_db_config()
-        
-        self.logger.info("Vector Search Tool initialized with Vertex AI embeddings")
-    
-    def _load_db_config(self):
-        """Fetch and parse DB credentials from Secret Manager."""
-        try:
-            secret_name = f"projects/{self.project_id}/secrets/postgres-config/versions/latest"
-            response = self.secret_client.access_secret_version(request={"name": secret_name})
-            secret_data = json.loads(response.payload.data.decode("UTF-8"))
+        self._db_manager: Optional[DatabaseConnector] = None
 
-            return {
-                'host': secret_data["host"],
-                'port': secret_data.get("port", 5432),
-                'database': secret_data["database"],
-                'user': secret_data["user"],
-                'password': secret_data["password"],
-                'min_size': 5,
-                'max_size': 20,
-                'command_timeout': 60
-            }
-        except Exception as e:
-            self.logger.error(f"Failed to load DB config: {e}")
-            raise
-
-    async def initialize_connection_pool(self):
-        """Establish PostgreSQL connection pool."""
-        try:
-            if not self.connection_pool:
-                self.connection_pool = await asyncpg.create_pool(**self.db_config)
-                self.logger.info("VectorSearchTool: PostgreSQL connection pool initialized")
-        except Exception as e:
-            self.logger.error(f"VectorSearchTool: Failed to initialize connection pool: {e}")
-            raise
-
-    async def close_connection_pool(self):
-        """Close the PostgreSQL connection pool."""
-        if self.connection_pool:
-            await self.connection_pool.close()
-            self.connection_pool = None
-            self.logger.info("VectorSearchTool: Connection pool closed")
+    async def _get_db_manager(self) -> DatabaseConnector:
+        """Get the database manager instance."""
+        if self._db_manager is None:
+            self._db_manager = await DatabaseConnector.get_instance(self.project_id)
+        return self._db_manager
     
     async def search_similar_transactions(
         self,
@@ -182,6 +142,7 @@ class VectorSearchTool:
             Dictionary containing similar merchants and alternatives
         """
         try:
+            db_manager = await self._get_db_manager()
             # Generate embedding for merchant name
             merchant_embedding = await self._generate_text_embedding(merchant_name)
             
@@ -205,7 +166,7 @@ class VectorSearchTool:
             LIMIT %s;
             """
             
-            async with self.connection_pool.acquire() as conn:
+            async with db_manager.get_connection() as conn:
                 results = await conn.fetch(
                     query, 
                     merchant_embedding, merchant_embedding, 
@@ -265,6 +226,7 @@ class VectorSearchTool:
             Dictionary containing identified spending clusters
         """
         try:
+            db_manager = await self._get_db_manager()
             # Get user transactions with embeddings
             date_range = self._get_date_range_filter(time_period)
             
@@ -288,7 +250,7 @@ class VectorSearchTool:
             ORDER BY t.transaction_date DESC;
             """
             
-            async with self.connection_pool.acquire() as conn:
+            async with db_manager.get_connection() as conn:
                 transactions = await conn.fetch(query, user_id, date_range['start'], date_range['end'])
             
             if len(transactions) < min_cluster_size:
@@ -349,6 +311,7 @@ class VectorSearchTool:
             Dictionary containing detected anomalies
         """
         try:
+            db_manager = await self._get_db_manager()
             # Get user's spending patterns
             patterns = await self._get_user_spending_patterns(user_id, time_period)
             
@@ -381,7 +344,7 @@ class VectorSearchTool:
             ORDER BY t.transaction_date DESC;
             """
             
-            async with self.connection_pool.acquire() as conn:
+            async with db_manager.get_connection() as conn:
                 recent_transactions = await conn.fetch(
                     query, user_id, recent_date_range['start']
                 )
@@ -438,6 +401,7 @@ class VectorSearchTool:
             Dictionary containing pattern matches and insights
         """
         try:
+            db_manager = await self._get_db_manager()
             # Generate embedding for current transaction
             transaction_text = self._format_transaction_for_embedding(current_transaction)
             current_embedding = await self._generate_text_embedding(transaction_text)
@@ -467,7 +431,7 @@ class VectorSearchTool:
             LIMIT 20;
             """
             
-            async with self.connection_pool.acquire() as conn:
+            async with db_manager.get_connection() as conn:
                 matches = await conn.fetch(
                     query, 
                     current_embedding, user_id, 
@@ -524,7 +488,7 @@ class VectorSearchTool:
         user_id: Optional[str]
     ) -> List[Dict[str, Any]]:
         """Execute vector search query based on search type."""
-        
+        db_manager = await self._get_db_manager()
         base_conditions = []
         params = [embedding, embedding, 1 - threshold, embedding, limit]
         
@@ -586,7 +550,7 @@ class VectorSearchTool:
         LIMIT %s;
         """
         
-        async with self.connection_pool.acquire() as conn:
+        async with db_manager.get_connection() as conn:
             results = await conn.fetch(query, *params)
         
         return [dict(row) for row in results]
@@ -603,19 +567,19 @@ class VectorSearchTool:
             enhanced_result = result.copy()
             
             # Convert Decimal to float for JSON serialization
-            if 'amount' in enhanced_result:
+            if 'amount' in enhanced_result and enhanced_result['amount'] is not None:
                 enhanced_result['amount'] = float(enhanced_result['amount'])
-            if 'similarity_score' in enhanced_result:
+            if 'similarity_score' in enhanced_result and enhanced_result['similarity_score'] is not None:
                 enhanced_result['similarity_score'] = float(enhanced_result['similarity_score'])
             
             # Convert date to string
-            if 'transaction_date' in enhanced_result:
+            if 'transaction_date' in enhanced_result and enhanced_result['transaction_date'] is not None:
                 enhanced_result['transaction_date'] = enhanced_result['transaction_date'].isoformat()
             
             # Add search context
             enhanced_result['search_context'] = {
                 'search_type': search_type,
-                'relevance_level': self._categorize_similarity_score(enhanced_result['similarity_score'])
+                'relevance_level': self._categorize_similarity_score(enhanced_result.get('similarity_score', 0))
             }
             
             enhanced_results.append(enhanced_result)
@@ -659,16 +623,16 @@ class VectorSearchTool:
         """Format transaction data for embedding generation."""
         parts = []
         
-        if 'merchant_name' in transaction:
+        if 'merchant_name' in transaction and transaction['merchant_name']:
             parts.append(f"Merchant: {transaction['merchant_name']}")
-        if 'category' in transaction:
+        if 'category' in transaction and transaction['category']:
             parts.append(f"Category: {transaction['category']}")
-        if 'amount' in transaction:
+        if 'amount' in transaction and transaction['amount']:
             parts.append(f"Amount: ${transaction['amount']}")
-        if 'description' in transaction:
+        if 'description' in transaction and transaction['description']:
             parts.append(f"Description: {transaction['description']}")
         
-        return " | ".join(parts)
+        return " | ".join(parts) if parts else "Unknown transaction"
     
     async def _get_merchant_alternatives(
         self,
@@ -678,6 +642,7 @@ class VectorSearchTool:
     ) -> List[Dict[str, Any]]:
         """Get alternative merchants in the same category."""
         try:
+            db_manager = await self._get_db_manager()
             query = """
             SELECT 
                 m.merchant_id,
@@ -704,10 +669,10 @@ class VectorSearchTool:
             LIMIT 5;
             """
             
-            normalized_original = original_merchant.lower().strip()
+            normalized_original = original_merchant.lower().strip() if original_merchant else ""
             
-            async with self.connection_pool.acquire() as conn:
-                results = await conn.fetch(query, user_id or '', category, normalized_original)
+            async with db_manager.get_connection() as conn:
+                results = await conn.fetch(query, user_id or '', category or '', normalized_original)
             
             alternatives = []
             for row in results:
@@ -814,9 +779,12 @@ class VectorSearchTool:
             return {}
         
         # Calculate basic statistics
-        amounts = [float(t['amount']) for t in transactions]
-        categories = [t['category'] for t in transactions]
-        dates = [t['transaction_date'] for t in transactions]
+        amounts = [float(t['amount']) for t in transactions if t['amount'] is not None]
+        categories = [t['category'] for t in transactions if t['category']]
+        dates = [t['transaction_date'] for t in transactions if t['transaction_date']]
+        
+        if not amounts or not categories or not dates:
+            return {"error": "Insufficient data for cluster analysis"}
         
         # Find dominant category
         category_counts = {}
@@ -856,6 +824,9 @@ class VectorSearchTool:
         
         for cluster in clusters:
             chars = cluster['characteristics']
+            if 'error' in chars:
+                continue
+                
             summary = {
                 "cluster_id": cluster['cluster_id'],
                 "size": chars['transaction_count'],
@@ -881,15 +852,14 @@ class VectorSearchTool:
     ) -> List[Dict[str, Any]]:
         """Get established spending patterns for a user."""
         date_range = self._get_date_range_filter(time_period)
-        
+        db_manager = await self._get_db_manager()
         query = """
         SELECT 
             t.category,
             t.subcategory,
             AVG(t.amount) as avg_amount,
             STDDEV(t.amount) as amount_stddev,
-            COUNT(*) as transaction_count,
-            AVG(t.transaction_embedding) as avg_embedding
+            COUNT(*) as transaction_count
         FROM transactions t
         WHERE t.user_id = %s 
             AND t.transaction_date >= %s 
@@ -901,7 +871,7 @@ class VectorSearchTool:
         ORDER BY transaction_count DESC;
         """
         
-        async with self.connection_pool.acquire() as conn:
+        async with db_manager.get_connection() as conn:
             results = await conn.fetch(query, user_id, date_range['start'], date_range['end'])
         
         return [dict(row) for row in results]
@@ -928,8 +898,8 @@ class VectorSearchTool:
                 pattern = pattern_lookup[key]
                 
                 # Check amount anomaly
-                expected_amount = float(pattern['avg_amount'])
-                actual_amount = float(transaction['amount'])
+                expected_amount = float(pattern['avg_amount']) if pattern['avg_amount'] else 0
+                actual_amount = float(transaction['amount']) if transaction['amount'] else 0
                 amount_stddev = float(pattern['amount_stddev']) if pattern['amount_stddev'] else 0
                 
                 # Calculate z-score for amount deviation
@@ -943,22 +913,6 @@ class VectorSearchTool:
                             'actual_amount': actual_amount,
                             'z_score': z_score,
                             'severity': 'high' if z_score > 3 else 'medium'
-                        })
-                
-                # Check for embedding similarity (behavioral anomaly)
-                if pattern['avg_embedding'] and transaction['transaction_embedding']:
-                    similarity = await self._calculate_vector_similarity(
-                        pattern['avg_embedding'],
-                        transaction['transaction_embedding']
-                    )
-                    
-                    if similarity < threshold:
-                        anomalies.append({
-                            'transaction': transaction,
-                            'anomaly_type': 'behavioral_deviation',
-                            'similarity_score': similarity,
-                            'expected_pattern': pattern,
-                            'severity': 'low' if similarity > threshold * 0.8 else 'medium'
                         })
             else:
                 # Transaction in category with no established pattern
@@ -979,37 +933,38 @@ class VectorSearchTool:
         classified_anomalies = []
         
         for anomaly in anomalies:
+            transaction = anomaly.get('transaction', {})
             classification = {
                 'anomaly_id': f"anomaly_{len(classified_anomalies)}",
                 'user_id': user_id,
-                'transaction_id': anomaly['transaction']['transaction_id'],
+                'transaction_id': transaction.get('transaction_id'),
                 'type': anomaly['anomaly_type'],
                 'severity': anomaly['severity'],
                 'detected_at': datetime.now().isoformat(),
                 'transaction_details': {
-                    'amount': float(anomaly['transaction']['amount']),
-                    'merchant': anomaly['transaction']['merchant_name'],
-                    'category': anomaly['transaction']['category'],
-                    'date': anomaly['transaction']['transaction_date'].isoformat()
+                    'amount': float(transaction['amount']) if transaction.get('amount') else 0,
+                    'merchant': transaction.get('merchant_name', 'Unknown'),
+                    'category': transaction.get('category', 'Unknown'),
+                    'date': transaction['transaction_date'].isoformat() if transaction.get('transaction_date') else None
                 }
             }
             
             # Add type-specific details
             if anomaly['anomaly_type'] == 'amount_deviation':
                 classification['details'] = {
-                    'expected_amount': anomaly['expected_amount'],
-                    'actual_amount': anomaly['actual_amount'],
-                    'z_score': anomaly['z_score'],
-                    'description': f"Amount ${anomaly['actual_amount']:.2f} is significantly different from expected ${anomaly['expected_amount']:.2f}"
+                    'expected_amount': anomaly.get('expected_amount', 0),
+                    'actual_amount': anomaly.get('actual_amount', 0),
+                    'z_score': anomaly.get('z_score', 0),
+                    'description': f"Amount ${anomaly.get('actual_amount', 0):.2f} is significantly different from expected ${anomaly.get('expected_amount', 0):.2f}"
                 }
             elif anomaly['anomaly_type'] == 'behavioral_deviation':
                 classification['details'] = {
-                    'similarity_score': anomaly['similarity_score'],
-                    'description': f"Transaction pattern unusual for this category (similarity: {anomaly['similarity_score']:.2f})"
+                    'similarity_score': anomaly.get('similarity_score', 0),
+                    'description': f"Transaction pattern unusual for this category (similarity: {anomaly.get('similarity_score', 0):.2f})"
                 }
             elif anomaly['anomaly_type'] == 'new_category':
                 classification['details'] = {
-                    'description': f"First transaction in category '{anomaly['transaction']['category']}'"
+                    'description': f"First transaction in category '{transaction.get('category', 'Unknown')}'"
                 }
             
             # Generate recommendations based on anomaly type
@@ -1041,9 +996,15 @@ class VectorSearchTool:
         frequency_analysis = {}
         
         for match in matches:
-            match_date = match['transaction_date']
+            match_date = match.get('transaction_date')
+            if not match_date:
+                continue
+                
             if isinstance(match_date, str):
-                match_date = datetime.fromisoformat(match_date).date()
+                try:
+                    match_date = datetime.fromisoformat(match_date).date()
+                except ValueError:
+                    continue
             
             # Monthly pattern analysis
             month_key = f"{match_date.year}-{match_date.month:02d}"
@@ -1058,14 +1019,17 @@ class VectorSearchTool:
             seasonal_patterns[season].append(match)
             
             # Frequency analysis by merchant
-            merchant = match['merchant_name']
+            merchant = match.get('merchant_name', 'Unknown')
             if merchant not in frequency_analysis:
                 frequency_analysis[merchant] = []
             frequency_analysis[merchant].append(match)
         
         # Calculate pattern statistics
-        amounts = [float(m['amount']) for m in matches]
-        similarities = [float(m['similarity_score']) for m in matches]
+        amounts = [float(m['amount']) for m in matches if m.get('amount') is not None]
+        similarities = [float(m['similarity_score']) for m in matches if m.get('similarity_score') is not None]
+        
+        if not amounts or not similarities:
+            return {"message": "Insufficient data for pattern analysis"}
         
         analysis = {
             'total_matches': len(matches),
@@ -1101,11 +1065,11 @@ class VectorSearchTool:
             stats = pattern_analysis['amount_statistics']
             
             # Amount trend insight
-            if stats['std_dev'] > stats['avg'] * 0.3:  # High variability
+            if stats.get('std_dev', 0) > stats.get('avg', 0) * 0.3:  # High variability
                 insights.append({
                     'type': 'amount_variability',
                     'title': 'Variable Spending Pattern',
-                    'description': f"Your spending in this category varies significantly (${stats['min']:.2f} - ${stats['max']:.2f})",
+                    'description': f"Your spending in this category varies significantly (${stats.get('min', 0):.2f} - ${stats.get('max', 0):.2f})",
                     'recommendation': 'Consider setting a more flexible budget or reviewing the necessity of higher amounts'
                 })
         
@@ -1113,7 +1077,7 @@ class VectorSearchTool:
             temporal = pattern_analysis['temporal_patterns']
             
             # Seasonal insight
-            if temporal['seasonal_distribution']:
+            if temporal.get('seasonal_distribution'):
                 peak_season = max(temporal['seasonal_distribution'].keys(), 
                                 key=lambda k: temporal['seasonal_distribution'][k])
                 insights.append({
@@ -1126,7 +1090,7 @@ class VectorSearchTool:
         if 'merchant_patterns' in pattern_analysis:
             merchant = pattern_analysis['merchant_patterns']
             
-            if merchant['most_frequent_merchant']:
+            if merchant.get('most_frequent_merchant'):
                 insights.append({
                     'type': 'merchant_loyalty',
                     'title': 'Preferred Merchant Identified',
@@ -1143,8 +1107,8 @@ class VectorSearchTool:
         """Generate recommendations based on anomaly type."""
         recommendations = []
         
-        anomaly_type = anomaly['anomaly_type']
-        transaction = anomaly['transaction']
+        anomaly_type = anomaly.get('anomaly_type')
+        transaction = anomaly.get('transaction', {})
         
         if anomaly_type == 'amount_deviation':
             if anomaly.get('z_score', 0) > 2:
@@ -1159,7 +1123,7 @@ class VectorSearchTool:
                         'type': 'budget_adjustment',
                         'title': 'Consider Budget Adjustment',
                         'description': 'If this spending level is becoming regular, adjust your budget',
-                        'action': f'Update budget for {transaction["category"]} category'
+                        'action': f'Update budget for {transaction.get("category", "this")} category'
                     }
                 ])
         
@@ -1175,7 +1139,7 @@ class VectorSearchTool:
                     'type': 'find_alternatives',
                     'title': 'Explore Alternatives',
                     'description': 'Consider if there are more cost-effective alternatives',
-                    'action': f'Look for alternative merchants in {transaction["category"]}'
+                    'action': f'Look for alternative merchants in {transaction.get("category", "this category")}'
                 }
             ])
         
@@ -1185,7 +1149,7 @@ class VectorSearchTool:
                     'type': 'budget_planning',
                     'title': 'Set Budget for New Category',
                     'description': 'This is a new spending category for you',
-                    'action': f'Set a monthly budget limit for {transaction["category"]}'
+                    'action': f'Set a monthly budget limit for {transaction.get("category", "this category")}'
                 },
                 {
                     'type': 'track_spending',
@@ -1240,13 +1204,13 @@ class VectorSearchTool:
         try:
             # Format merchant data for embedding
             parts = []
-            if 'name' in merchant_data:
+            if 'name' in merchant_data and merchant_data['name']:
                 parts.append(f"Name: {merchant_data['name']}")
-            if 'category' in merchant_data:
+            if 'category' in merchant_data and merchant_data['category']:
                 parts.append(f"Category: {merchant_data['category']}")
-            if 'subcategory' in merchant_data:
+            if 'subcategory' in merchant_data and merchant_data['subcategory']:
                 parts.append(f"Subcategory: {merchant_data['subcategory']}")
-            if 'merchant_type' in merchant_data:
+            if 'merchant_type' in merchant_data and merchant_data['merchant_type']:
                 parts.append(f"Type: {merchant_data['merchant_type']}")
             if 'address' in merchant_data and merchant_data['address']:
                 if isinstance(merchant_data['address'], dict):
@@ -1255,7 +1219,7 @@ class VectorSearchTool:
                     if city or state:
                         parts.append(f"Location: {city} {state}".strip())
             
-            merchant_text = " | ".join(parts)
+            merchant_text = " | ".join(parts) if parts else "Unknown merchant"
             
             # Generate embedding
             embedding = await self._generate_text_embedding(merchant_text)
@@ -1276,20 +1240,20 @@ class VectorSearchTool:
         try:
             # Format item data for embedding
             parts = []
-            if 'name' in item_data:
+            if 'name' in item_data and item_data['name']:
                 parts.append(f"Item: {item_data['name']}")
-            if 'category' in item_data:
+            if 'category' in item_data and item_data['category']:
                 parts.append(f"Category: {item_data['category']}")
-            if 'brand' in item_data:
+            if 'brand' in item_data and item_data['brand']:
                 parts.append(f"Brand: {item_data['brand']}")
-            if 'description' in item_data:
+            if 'description' in item_data and item_data['description']:
                 parts.append(f"Description: {item_data['description']}")
-            if 'size_info' in item_data:
+            if 'size_info' in item_data and item_data['size_info']:
                 parts.append(f"Size: {item_data['size_info']}")
             if item_data.get('is_organic'):
                 parts.append("Organic")
             
-            item_text = " | ".join(parts)
+            item_text = " | ".join(parts) if parts else "Unknown item"
             
             # Generate embedding
             embedding = await self._generate_text_embedding(item_text)
@@ -1312,9 +1276,11 @@ class VectorSearchTool:
         Utility method to batch update embeddings for existing records.
         Useful for migrating data or updating embeddings with new models.
         """
+        updated_count = 0
+        error_count = 0
+        
         try:
-            updated_count = 0
-            error_count = 0
+            db_manager = await self._get_db_manager()
             
             # Get records without embeddings
             query = f"""
@@ -1325,7 +1291,7 @@ class VectorSearchTool:
             LIMIT %s;
             """
             
-            async with self.connection_pool.acquire() as conn:
+            async with db_manager.get_connection() as conn:
                 while True:
                     records = await conn.fetch(query, batch_size)
                     
@@ -1375,8 +1341,9 @@ class VectorSearchTool:
     async def get_health_status(self) -> Dict[str, Any]:
         """Get health status of the vector search tool."""
         try:
+            db_manager = await self._get_db_manager()
             # Test database connection
-            async with self.connection_pool.acquire() as conn:
+            async with db_manager.get_connection() as conn:
                 await conn.fetchval("SELECT 1")
             db_status = "healthy"
             
@@ -1385,7 +1352,7 @@ class VectorSearchTool:
             embedding_status = "healthy" if len(test_embedding) == self.embedding_dimension else "unhealthy"
             
             # Get some statistics
-            async with self.connection_pool.acquire() as conn:
+            async with db_manager.get_connection() as conn:
                 stats = await conn.fetchrow("""
                 SELECT 
                     (SELECT COUNT(*) FROM transactions WHERE transaction_embedding IS NOT NULL) as transactions_with_embeddings,
