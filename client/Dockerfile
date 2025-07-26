@@ -21,8 +21,15 @@ COPY --from=builder /app/dist .
 # Copy dynamic NGINX config template
 COPY nginx.conf /etc/nginx/templates/default.conf.template
 
-# Cloud Run requires the container to listen on $PORT (default: 8080)
+# Copy entrypoint script to inject env.js
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Cloud Run requires this
 ENV PORT=8080
+
+# Use custom entrypoint for dynamic env injection
+ENTRYPOINT ["/entrypoint.sh"]
 
 # Start NGINX
 CMD ["nginx", "-g", "daemon off;"]

@@ -12,7 +12,7 @@ const firebaseConfig = {
   storageBucket: window.env?.VITE_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: window.env?.VITE_FIREBASE_MESSAGING_SENDER_ID,
   appId: window.env?.VITE_FIREBASE_APP_ID,
-  measurementId: window.env?.VITE_FIREBASE_MEASUREMENT_ID,
+  measurementId: window.env?.VITE_FIREBASE_MEASUREMENT_ID
 };
 
 console.log("[firebase.js] Firebase config:", firebaseConfig);
