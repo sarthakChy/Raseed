@@ -397,7 +397,7 @@ async def chat_handler(
         )
 
         user_query = body['query']
-        user_id = "eeec0ef0-a809-401a-8b58-32cc58a92671"
+        user_id = '4211f8cc-00f4-4c09-ad84-7192e3ea75e2'
 
         result = await orchestrator.process_query(
             query=user_query,

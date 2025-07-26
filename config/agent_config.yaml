@@ -260,7 +260,7 @@ workflows:
         required: true
         retry_count: 2
         input_mapping:
-          comparison_results: "perform_comparison.results"
+          analysis_results: "perform_comparison.results"
           original_query: "original_query"
           user_id: "user_id"
 

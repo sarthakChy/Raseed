@@ -2,7 +2,7 @@ class InsightSummaryTool:
     def __init__(self, model):
         self.model = model
 
-    def run(self, analysis_results: str, query: str, user_id: str) -> str:
+    def run(self, analysis_results: str, query: str, user_id: str, recommendations: str) -> str:
         prompt = f"""
 You are a financial insights assistant. Your task is to analyze a structured summary of the user's spending data and generate an insightful, natural language report. This should help the user understand not just what they spent on, but also **why it matters**, **how it compares**, and **what patterns emerge**.
 
@@ -11,7 +11,8 @@ You are a financial insights assistant. Your task is to analyze a structured sum
 - Query: "{query}"
 
 ## Data Summary
-{analysis_results}
+Analysis: {analysis_results}
+Recommendations: {recommendations}
 
 ## Instructions:
 - Focus on top spending categories, major contributors, and percentages.

@@ -31,13 +31,14 @@ class InsightSynthesisAgent(BaseAgent):
                     "properties": {
                         "analysis_results": {"type": "object"},
                         "original_query": {"type": "string"},
-                        "user_id": {"type": "string"}
+                        "user_id": {"type": "string"},
+                        "recommendations": {"type" : "object"},
                     },
                     "required": ["analysis_results"]
                 }
             ),
-            executor_func=lambda analysis_results, original_query="", user_id="": self.insight_tool.run(
-                analysis_results, original_query, user_id
+            executor_func=lambda analysis_results, recommendations, original_query="", user_id="" : self.insight_tool.run(
+                analysis_results, original_query, user_id, recommendations
             )
         )
 
@@ -85,9 +86,10 @@ class InsightSynthesisAgent(BaseAgent):
         analysis_results = request.get("analysis_results")
         original_query = request.get("original_query", "")
         user_id = request.get("user_id", "")
+        recommendations = request.get("recommendations")
 
         # Step 1: Generate insight summary
-        insight_summary = self.insight_tool.run(analysis_results, original_query, user_id)
+        insight_summary = self.insight_tool.run(analysis_results, original_query, user_id, recommendations)
 
         # Step 2: Suggest chart type and values
         visualisation = self.visualisation_tool.run(analysis_results, original_query, user_id)

@@ -37,7 +37,7 @@ const ReceiptDetailsDialog = ({ isOpen, onClose, receipt }) => {
             <strong>Payment Method:</strong> {titlecase(data.paymentMethod)}
           </p>
           <p>
-            <strong>Tax:</strong> ₹{(data.taxAmount || 0).toFixed(2)}
+            <strong>Tax:</strong> ₹{(data.tax || 0).toFixed(2)}
           </p>
           <p>
             <strong>Items:</strong>

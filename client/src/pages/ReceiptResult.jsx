@@ -140,6 +140,7 @@ const ReceiptResult = () => {
               <li><strong>Merchant:</strong> {analysisResult.ocrData.extractedData.merchantName || "N/A"}</li>
               <li><strong>Date:</strong> {analysisResult.ocrData.extractedData.date || "N/A"}</li>
               <li><strong>Total Amount:</strong> ₹{analysisResult.ocrData.extractedData.totalAmount || "N/A"}</li>
+              <li><strong>Tax:</strong> ₹{analysisResult.ocrData.extractedData.tax || "N/A"}</li>
               <li><strong>Payment Method:</strong> {toTitleCase(analysisResult.ocrData.extractedData.paymentMethod)}</li>
               <li><strong>Category:</strong> {toTitleCase(analysisResult.ocrData.extractedData.category)}</li>
               <li>
