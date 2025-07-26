@@ -60,7 +60,7 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 if not firebase_admin._apps:
-    FIREBASE_CRED_PATH = os.environ.get("FIREBASE_CRED_PATH", "firebase-sdk.json")
+    FIREBASE_CRED_PATH = os.environ.get("FIREBASE_CREDENTIALS", "firebase-sdk.json")
     try:
         cred = credentials.Certificate(FIREBASE_CRED_PATH)
         firebase_admin.initialize_app(cred)
