@@ -18,7 +18,7 @@ WORKDIR /usr/share/nginx/html
 RUN rm -rf ./*
 
 # Copy build output from previous stage
-COPY --from=builder /app/build .
+COPY --from=builder /app/dist .
 
 # Add SPA-friendly routing
 COPY nginx.conf /etc/nginx/conf.d/default.conf
