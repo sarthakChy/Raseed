@@ -25,6 +25,7 @@ const ScanReceipts = () => {
   const [imagePreview, setImagePreview] = useState(null);
   const [showCameraModal, setShowCameraModal] = useState(false);
   const [cameraStream, setCameraStream] = useState(null);
+  const [facingMode, setFacingMode] = useState('environment'); // default to back
   const navigate = useNavigate();
 
   const handleFileUpload = () => {
@@ -42,7 +43,9 @@ const ScanReceipts = () => {
 
   const handleCameraOpen = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode },
+      });
       setCameraStream(stream);
       setShowCameraModal(true);
       if (videoRef.current) {
@@ -76,6 +79,28 @@ const ScanReceipts = () => {
       cameraStream.getTracks().forEach((track) => track.stop());
     }
     setShowCameraModal(false);
+  };
+
+  const handleFlipCamera = async () => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach((track) => track.stop());
+    }
+
+    const newFacingMode = facingMode === 'user' ? 'environment' : 'user';
+    setFacingMode(newFacingMode);
+
+    try {
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: newFacingMode },
+      });
+      setCameraStream(newStream);
+      if (videoRef.current) {
+        videoRef.current.srcObject = newStream;
+      }
+    } catch (err) {
+      console.error('Flip camera failed:', err);
+      alert('Unable to switch camera.');
+    }
   };
 
   useEffect(() => {
@@ -134,20 +159,26 @@ const ScanReceipts = () => {
 
       {showCameraModal && (
         <div className="fixed inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center">
-          <div className="relative w-full max-w-lg p-4 bg-white rounded-xl shadow-xl">
+          <div className="relative w-full max-w-xs sm:max-w-md p-4 bg-white rounded-xl shadow-xl">
             <video
               ref={videoRef}
               autoPlay
               playsInline
               className="w-full rounded-xl"
-              style={{ maxHeight: '400px', objectFit: 'cover' }}
+              style={{ aspectRatio: '9/16', objectFit: 'cover' }}
             />
-            <div className="flex justify-center mt-4 gap-4">
+            <div className="flex justify-center mt-4 gap-4 flex-wrap">
               <button
                 className="bg-blue-600 text-white px-6 py-2 rounded-lg"
                 onClick={handleCapture}
               >
                 Capture
+              </button>
+              <button
+                className="bg-gray-700 text-white px-6 py-2 rounded-lg"
+                onClick={handleFlipCamera}
+              >
+                Flip Camera
               </button>
               <button
                 className="bg-red-500 text-white px-6 py-2 rounded-lg"
