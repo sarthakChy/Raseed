@@ -59,19 +59,6 @@ logger = logging.getLogger(__name__)
 # ========================== Environment Setup ==========================
 load_dotenv()
 
-# if not firebase_admin._apps:
-#     FIREBASE_CRED_PATH = os.environ.get("FIREBASE_CREDENTIALS", "firebase-sdk.json")
-#     try:
-#         cred = credentials.Certificate(FIREBASE_CRED_PATH)
-#         firebase_admin.initialize_app(cred)
-#     except Exception as e:
-#         raise RuntimeError(f"Could not initialize Firebase Admin SDK: {str(e)}")
-
-# import os
-# import json
-# import firebase_admin
-# from firebase_admin import credentials
-
 firebase_credentials_env = os.environ.get("FIREBASE_CREDENTIALS")
 
 try:

@@ -39,6 +39,7 @@ const ReceiptResult = () => {
         });
 
         const data = await res.json();
+        
         if (res.ok && data) {
           setAnalysisResult(data);
           setAnalysisStatus("success");
@@ -55,33 +56,41 @@ const ReceiptResult = () => {
   }, []);
 
   const handleAddToWallet = async () => {
-    setWalletStatus("adding");
-    try {
-      const token = await user.getIdToken();
+  setWalletStatus("adding");
+  try {
+    const token = await user.getIdToken();
 
-      const response = await fetch(`${BACKEND_URL}/shopping-list/create-shopping-pass`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          items: analysisResult?.ocrData?.extractedData?.items || [],
-          merchant: analysisResult?.ocrData?.extractedData?.merchantName || "",
-          totalAmount: analysisResult?.ocrData?.extractedData?.totalAmount || 0,
-        }),
-      });
+    const response = await fetch(`${BACKEND_URL}/receipts/create-wallet-pass`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        uuid: analysisResult?.receiptId || "",
+      }),
+    });
 
-      if (response.ok) {
+    if (response.ok) {
+      const data = await response.json();
+      console.log("Wallet Pass Created");
+      if (data.wallet_link) {
         setWalletStatus("success");
+        window.open(data.wallet_link, "_blank");
       } else {
+        console.error("No wallet_link in response");
         setWalletStatus("error");
       }
-    } catch (err) {
-      console.error("Add to wallet failed:", err);
+    } else {
+      console.error("Wallet creation failed:", response.status);
       setWalletStatus("error");
     }
-  };
+  } catch (err) {
+    console.error("Add to wallet failed:", err);
+    setWalletStatus("error");
+  }
+};
+
 
   const toTitleCase = (str) =>
     str ? str.charAt(0).toUpperCase() + str.slice(1).toLowerCase() : "N/A";
