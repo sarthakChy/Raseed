@@ -97,10 +97,10 @@ const History = () => {
         const transformed = data.receipts
   .sort((a, b) => new Date(b.processedAt) - new Date(a.processedAt)) // ✅ sort by processedAt DESC
   .map((r) => {
-    if(flag) {
-      console.log(r);
-      flag = !flag;
-    }
+    // if(flag) {
+    //   console.log(r);
+    //   flag = !flag;
+    // }
     const extracted = r.ocrData?.extractedData || {};
 
     const titlecase = (str) => {
