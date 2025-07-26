@@ -1,21 +1,21 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 
-// Log all import.meta.env variables
-console.log("[firebase.ts] import.meta.env:", import.meta.env);
+// Log all window.env variables (in production build)
+console.log("[firebase.js] window.env:", window.env);
 
-// Build and log firebaseConfig
+// Build and log Firebase config from injected env.js
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
+  apiKey: window.env?.VITE_FIREBASE_API_KEY,
+  authDomain: window.env?.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: window.env?.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: window.env?.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: window.env?.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: window.env?.VITE_FIREBASE_APP_ID,
+  measurementId: window.env?.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
-console.log("[firebase.ts] Firebase config:", firebaseConfig);
+console.log("[firebase.js] Firebase config:", firebaseConfig);
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
