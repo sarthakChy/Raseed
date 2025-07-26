@@ -1,7 +1,10 @@
 import React from "react";
+import Header from "../components/Header";
 
 const Upgrade = () => {
   return (
+    <>
+    <Header />
     <div className="bg-white h-full font-sans">
       <main className="p-10">
         <h1 className="text-4xl font-bold text-gray-800 mb-8">Upgrade Plan</h1>
@@ -91,6 +94,8 @@ const Upgrade = () => {
         </div>
       </main>
     </div>
+    </>
+    
   );
 };
 

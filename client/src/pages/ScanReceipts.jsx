@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { FiUpload, FiCamera } from 'react-icons/fi';
 import { SiGoogledrive } from 'react-icons/si';
 import { useNavigate } from 'react-router-dom';
+import Header from '../components/Header'; // ✅ Add this line
 
 const OptionCard = ({ icon, title, description, buttonText, onClick }) => (
   <div className="bg-white p-8 rounded-xl border border-gray-200 shadow-sm flex flex-col items-center justify-between text-center w-full sm:w-72 h-80">
@@ -110,34 +111,36 @@ const ScanReceipts = () => {
   ];
 
   return (
-    <div className="bg-gray-50 min-h-full flex items-center justify-center p-4">
-      <div className="bg-white p-8 sm:p-12 rounded-2xl border border-gray-200 shadow-lg text-center max-w-4xl w-full">
-        <h1 className="text-3xl font-bold text-gray-800 mb-2">Scan or Upload Your Receipt</h1>
-        <p className="text-gray-600 mb-10">Choose one of the options below to start processing your receipt.</p>
+    <>
+      <Header /> {/* ✅ Add this inside the return */}
+      <div className="bg-gray-50 min-h-full flex items-center justify-center p-4">
+        <div className="bg-white p-8 sm:p-12 rounded-2xl border border-gray-200 shadow-lg text-center max-w-4xl w-full">
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">Scan or Upload Your Receipt</h1>
+          <p className="text-gray-600 mb-10">Choose one of the options below to start processing your receipt.</p>
 
-        <input
-          type="file"
-          ref={fileInputRef}
-          style={{ display: 'none' }}
-          accept="image/*,.pdf"
-          onChange={handleFileChange}
-        />
+          <input
+            type="file"
+            ref={fileInputRef}
+            style={{ display: 'none' }}
+            accept="image/*,.pdf"
+            onChange={handleFileChange}
+          />
 
-        {!imagePreview ? (
-          <div className="flex flex-col md:flex-row justify-center items-center gap-8">
-            {uploadOptions.map((option) => (
-              <OptionCard key={option.title} {...option} />
-            ))}
-          </div>
-        ) : (
-          <div className="flex flex-col items-center">
-            <img src={imagePreview} alt="Selected" className="max-w-md rounded-xl shadow-md mb-6" />
-            <p className="text-blue-600 font-semibold mb-4">Redirecting to analyze...</p>
-          </div>
-        )}
+          {!imagePreview ? (
+            <div className="flex flex-col md:flex-row justify-center items-center gap-8">
+              {uploadOptions.map((option) => (
+                <OptionCard key={option.title} {...option} />
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center">
+              <img src={imagePreview} alt="Selected" className="max-w-md rounded-xl shadow-md mb-6" />
+              <p className="text-blue-600 font-semibold mb-4">Redirecting to analyze...</p>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
-};
-
+}
 export default ScanReceipts;

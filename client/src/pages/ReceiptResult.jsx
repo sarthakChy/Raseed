@@ -108,6 +108,16 @@ const ReceiptResult = () => {
     }
   }, [walletStatus]);
 
+  useEffect(() => {
+  if (analysisStatus === "processing") {
+    const interval = setInterval(() => {
+      setDotCount((prev) => (prev % 3) + 1);
+    }, 500);
+    return () => clearInterval(interval);
+  }
+}, [analysisStatus]);
+
+
   return (
     <div className="bg-gray-50 min-h-screen p-4">
       <button
@@ -119,31 +129,22 @@ const ReceiptResult = () => {
 
       <div className="bg-white p-8 sm:p-12 rounded-2xl border border-gray-200 shadow-lg text-center max-w-4xl w-full mx-auto">
         {imagePreview && (
-          <img
-            src={imagePreview}
-            alt="Selected"
-            className="max-w-md rounded-xl shadow-md mb-6"
-          />
-        )}
+  <div className="h-[50vh] flex justify-center items-center mb-6">
+    <img
+      src={imagePreview}
+      alt="Selected"
+      className="max-h-full max-w-full object-contain rounded-xl shadow-md"
+    />
+  </div>
+)}
 
-        {walletStatus === "adding" && (
-          <p className="text-blue-600 font-semibold mb-4">
-            Adding to wallet{".".repeat(dotCount)}
-          </p>
-        )}
-        {walletStatus === "success" && (
-          <p className="text-green-600 font-semibold mb-4">
-            Successfully added to your Google Wallet!
-          </p>
-        )}
-        {walletStatus === "error" && (
-          <p className="text-red-600 font-semibold mb-4">
-            Failed to add to wallet. Please try again.
-          </p>
-        )}
+
+
+
+        
 
         {analysisStatus === "success" && analysisResult?.ocrData?.extractedData ? (
-          <div className="w-full bg-gray-100 rounded-xl p-6 text-left mb-4 shadow">
+          <div className="w-full bg-gray-100 rounded-xl p-6 text-left mb-4 shadow text-xs md:text-lg lg:text-xl">
             <h3 className="text-xl font-bold mb-4 text-gray-800">Extracted Receipt Details</h3>
             <ul className="space-y-2 text-gray-700">
               <li><strong>Merchant:</strong> {analysisResult.ocrData.extractedData.merchantName || "N/A"}</li>
@@ -170,9 +171,27 @@ const ReceiptResult = () => {
             </ul>
           </div>
         ) : analysisStatus === "processing" ? (
-          <p className="text-blue-500 font-semibold">Analyzing receipt…</p>
+          <p className="text-blue-600 font-semibold mb-4">
+            Analyzing Receipt{".".repeat(dotCount)}
+          </p>
         ) : (
           <p className="text-red-600 font-semibold mb-4">Error analyzing receipt.</p>
+        )}
+
+        {walletStatus === "adding" && (
+          <p className="text-blue-600 font-semibold mb-4">
+            Adding to wallet{".".repeat(dotCount)}
+          </p>
+        )}
+        {walletStatus === "success" && (
+          <p className="text-green-600 font-semibold mb-4">
+            Successfully added to your Google Wallet!
+          </p>
+        )}
+        {walletStatus === "error" && (
+          <p className="text-red-600 font-semibold mb-4">
+            Failed to add to wallet. Please try again.
+          </p>
         )}
 
         <div className="flex gap-4 mt-4 justify-center">

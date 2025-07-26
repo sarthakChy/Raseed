@@ -14,6 +14,7 @@ import {
 } from 'react-icons/fa';
 import { getAuth } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
+import Header from '../components/Header';
 import ReceiptDetailsDialog from '../components/ReceiptDetailsDialog';
 import DeleteConfirmationDialog from "../components/DeleteConfirmationDialog";
 
@@ -46,16 +47,16 @@ const CategoryTag = ({ category }) => {
 
 // --- Receipt Row Component ---
 const ReceiptRow = ({ receipt, onView, onDelete }) => (
-  <div className="flex items-center space-x-4 p-4 border-b border-gray-200 last:border-b-0">
+  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 border-b border-gray-200 last:border-b-0">
     <div className="flex-1">
       <div className="text-lg font-semibold text-gray-800">{receipt.storeName}</div>
       <div className="text-sm text-gray-500">{receipt.subText} • {receipt.date}</div>
     </div>
-    <div className="flex flex-col sm:flex-row sm:items-center sm:gap-3 text-right">
+    <div className="flex flex-col sm:flex-row items-start sm:items-center sm:gap-3">
       <div className="text-md font-bold text-gray-800">{receipt.amount}</div>
       <CategoryTag category={receipt.category} />
     </div>
-    <div className="flex items-center space-x-6 text-gray-600 font-medium">
+    <div className="flex items-center gap-4 text-gray-600 font-medium">
       <button className="hover:text-blue-600" onClick={() => onView(receipt)}>View</button>
       <button className="hover:text-red-600" onClick={onDelete}>Delete</button>
     </div>
@@ -95,17 +96,6 @@ const History = () => {
 
         const transformed = data.receipts.map((r) => {
           const extracted = r.ocrData?.extractedData || {};
-          const iconMap = {
-            Shopping: FaShoppingCart,
-            Dining: FaUtensils,
-            Electronics: FaLaptop,
-            Grocery: FaLeaf,
-            Clothing: FaTshirt,
-            Healthcare: FaHeartbeat,
-            Travel: FaBus,
-            Utilities: FaBolt,
-            Food: FaUtensils
-          };
 
           const titlecase = (str) => {
             if (typeof str !== 'string') return 'Not Added';
@@ -128,7 +118,6 @@ const History = () => {
 
           return {
             id: r.receiptId,
-            icon: iconMap[category] || FaListUl,
             storeName: extracted.merchantName || "Unknown Store",
             date: formattedDate,
             amount: `₹${(extracted.totalAmount || 0).toFixed(2)}`,
@@ -185,60 +174,63 @@ const History = () => {
   };
 
   return (
-    <div className="bg-gray-50 h-full p-4 sm:p-8">
-      <div className="max-w-7xl mx-auto bg-white p-8 rounded-2xl border border-gray-200">
-        <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
-          <h1 className="text-3xl font-bold text-gray-800 mb-4 sm:mb-0">Receipts History</h1>
-        </header>
+    <>
+      <Header />
+      <div className="bg-gray-50 min-h-screen p-4 sm:p-8">
+        <div className="max-w-7xl mx-auto bg-white p-6 sm:p-8 rounded-2xl border border-gray-200">
+          <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
+            <h1 className="text-3xl font-bold text-gray-800 mb-4 sm:mb-0">Receipts History</h1>
+          </header>
 
-        <div className="bg-white rounded-lg border border-gray-200">
-          {loading ? (
-            <div className="p-6 text-center text-gray-500">Loading receipts...</div>
-          ) : receipts.length === 0 ? (
-            <div className="p-6 text-center text-gray-500">No receipts available.</div>
-          ) : (
-            receipts.map((receipt) => (
-              <ReceiptRow
-                key={receipt.id}
-                receipt={receipt}
-                onView={(r) => {
-                  setSelectedReceipt(r);
-                  setDialogOpen(true);
-                }}
-                onDelete={() => confirmDelete(receipt.id)}
-              />
-            ))
-          )}
+          <div className="bg-white rounded-lg border border-gray-200">
+            {loading ? (
+              <div className="p-6 text-center text-gray-500">Loading receipts...</div>
+            ) : receipts.length === 0 ? (
+              <div className="p-6 text-center text-gray-500">No receipts available.</div>
+            ) : (
+              receipts.map((receipt) => (
+                <ReceiptRow
+                  key={receipt.id}
+                  receipt={receipt}
+                  onView={(r) => {
+                    setSelectedReceipt(r);
+                    setDialogOpen(true);
+                  }}
+                  onDelete={() => confirmDelete(receipt.id)}
+                />
+              ))
+            )}
+          </div>
+
+          <footer className="flex flex-col sm:flex-row justify-start items-center gap-4 mt-8">
+            <button
+              className="bg-white text-gray-800 font-bold py-3 px-6 rounded-lg border-2 border-gray-300 hover:bg-gray-100 transition-colors"
+              onClick={() => navigate('/dashboard')}
+            >
+              View Dashboard
+            </button>
+            <button className="bg-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-700 transition-colors">
+              Export Receipts
+            </button>
+          </footer>
         </div>
 
-        <footer className="flex justify-start items-center space-x-4 mt-8">
-          <button
-            className="bg-white text-gray-800 font-bold py-3 px-6 rounded-lg border-2 border-gray-300 hover:bg-gray-100 transition-colors"
-            onClick={() => navigate('/dashboard')}
-          >
-            View Dashboard
-          </button>
-          <button className="bg-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-700 transition-colors">
-            Export Receipts
-          </button>
-        </footer>
+        <ReceiptDetailsDialog
+          isOpen={dialogOpen}
+          onClose={() => setDialogOpen(false)}
+          receipt={selectedReceipt}
+        />
+
+        <DeleteConfirmationDialog
+          isOpen={deleteDialogOpen}
+          onCancel={() => {
+            setDeleteDialogOpen(false);
+            setReceiptToDelete(null);
+          }}
+          onConfirm={handleDeleteConfirmed}
+        />
       </div>
-
-      <ReceiptDetailsDialog
-        isOpen={dialogOpen}
-        onClose={() => setDialogOpen(false)}
-        receipt={selectedReceipt}
-      />
-
-      <DeleteConfirmationDialog
-        isOpen={deleteDialogOpen}
-        onCancel={() => {
-          setDeleteDialogOpen(false);
-          setReceiptToDelete(null);
-        }}
-        onConfirm={handleDeleteConfirmed}
-      />
-    </div>
+    </>
   );
 };
 
