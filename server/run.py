@@ -409,6 +409,8 @@ async def update_wallet_pass(
 
 # ============================= Chat ===============================================
 
+from utils.user_lookup import get_user_id_by_firebase_uid
+
 @app.post("/chat")
 async def chat_handler(
     request: Request,
@@ -416,15 +418,28 @@ async def chat_handler(
     body: dict = Body(...)
 ):
     try:
+        # ✅ Get firebase UID from auth header
+        firebase_uid = auth.get("uid")
+        if not firebase_uid:
+            raise HTTPException(status_code=401, detail="Invalid authentication")
+
+        # ✅ Get project_id
+        project_id = os.getenv("GCP_PROJECT_ID")
+
+        # ✅ Fetch user_id from DB
+        user_id = await get_user_id_by_firebase_uid(firebase_uid, project_id)
+        
+        if not user_id:
+            raise HTTPException(status_code=404, detail="User not found")
+        
         orchestrator = MasterOrchestrator(
-            project_id=os.getenv("PROJECT_ID"),
+            project_id=project_id,
             config_path="config/agent_config.yaml",
             location="us-central1",
             model_name="gemini-2.0-flash-001"
         )
 
         user_query = body['query']
-        user_id = '4211f8cc-00f4-4c09-ad84-7192e3ea75e2'
 
         result = await orchestrator.process_query(
             query=user_query,
@@ -438,7 +453,7 @@ async def chat_handler(
 
         full_json = json.loads(result.model_dump_json())
         step_results = full_json.get("step_results", {})
-        print(full_json)
+
         # Check each possible key in priority order
         possible_keys = [
             "synthesize_insights",
@@ -462,7 +477,7 @@ async def chat_handler(
     except Exception as e:
         print(f"Error in /chat: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-       
+
 # ============================= Receipt History ===============================================
 
 from datetime import datetime
