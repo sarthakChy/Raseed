@@ -155,6 +155,9 @@ async def firebase_auth_required(request: Request):
 async def root(request: Request, auth=Depends(firebase_auth_required)):
     return {"message": "Welcome to the API. Visit /docs for documentation."}
 
+@app.get("/healthz")
+async def root(request: Request):
+    return {"message": "RASEED BACKEND IS LIVE!"}
 
 @app.post("/receipts/analyze")
 async def analyze_receipt(
