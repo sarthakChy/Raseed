@@ -67,6 +67,11 @@ load_dotenv()
 #     except Exception as e:
 #         raise RuntimeError(f"Could not initialize Firebase Admin SDK: {str(e)}")
 
+# import os
+# import json
+# import firebase_admin
+# from firebase_admin import credentials
+
 firebase_credentials_env = os.environ.get("FIREBASE_CREDENTIALS")
 
 try:
@@ -76,6 +81,11 @@ try:
     if firebase_credentials_env.strip().startswith("{"):
         # JSON string provided directly
         cred_dict = json.loads(firebase_credentials_env)
+
+        # 🔧 Escape newlines in private_key (important!)
+        if "private_key" in cred_dict:
+            cred_dict["private_key"] = cred_dict["private_key"].replace("\\n", "\n")
+
         cred = credentials.Certificate(cred_dict)
     else:
         # Assume it's a path
