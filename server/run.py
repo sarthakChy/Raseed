@@ -59,13 +59,33 @@ logger = logging.getLogger(__name__)
 # ========================== Environment Setup ==========================
 load_dotenv()
 
-if not firebase_admin._apps:
-    FIREBASE_CRED_PATH = os.environ.get("FIREBASE_CREDENTIALS", "firebase-sdk.json")
-    try:
-        cred = credentials.Certificate(FIREBASE_CRED_PATH)
-        firebase_admin.initialize_app(cred)
-    except Exception as e:
-        raise RuntimeError(f"Could not initialize Firebase Admin SDK: {str(e)}")
+# if not firebase_admin._apps:
+#     FIREBASE_CRED_PATH = os.environ.get("FIREBASE_CREDENTIALS", "firebase-sdk.json")
+#     try:
+#         cred = credentials.Certificate(FIREBASE_CRED_PATH)
+#         firebase_admin.initialize_app(cred)
+#     except Exception as e:
+#         raise RuntimeError(f"Could not initialize Firebase Admin SDK: {str(e)}")
+
+firebase_credentials_env = os.environ.get("FIREBASE_CREDENTIALS")
+
+try:
+    if not firebase_credentials_env:
+        raise RuntimeError("FIREBASE_CREDENTIALS env variable is missing.")
+
+    if firebase_credentials_env.strip().startswith("{"):
+        # JSON string provided directly
+        cred_dict = json.loads(firebase_credentials_env)
+        cred = credentials.Certificate(cred_dict)
+    else:
+        # Assume it's a path
+        cred = credentials.Certificate(firebase_credentials_env)
+
+    firebase_admin.initialize_app(cred)
+
+except Exception as e:
+    raise RuntimeError(f"Could not initialize Firebase Admin SDK: {e}")
+
 
 PROJECT_ID,LOCATION,BUCKET_NAME,GOOGLE_WALLET_ISSUER_ID = get_credentials()
 
