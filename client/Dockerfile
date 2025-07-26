@@ -2,26 +2,27 @@
 FROM node:20 AS builder
 WORKDIR /app
 
-# Install dependencies
 COPY package*.json ./
 RUN npm install
 
-# Copy the app and build
 COPY . .
 RUN npm run build
 
-# --- Stage 2: Serve with NGINX on port 80 ---
+# --- Stage 2: Serve with NGINX ---
 FROM nginx:stable-alpine
 WORKDIR /usr/share/nginx/html
 
-# Clean default nginx files
+# Remove default static files
 RUN rm -rf ./*
 
-# Copy build output from previous stage
+# Copy built frontend files
 COPY --from=builder /app/dist .
 
-# Add SPA-friendly routing
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Copy dynamic NGINX config template
+COPY nginx.conf /etc/nginx/templates/default.conf.template
 
-EXPOSE 80
+# Cloud Run requires the container to listen on $PORT (default: 8080)
+ENV PORT=8080
+
+# Start NGINX
 CMD ["nginx", "-g", "daemon off;"]
