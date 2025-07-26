@@ -1,8 +1,7 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { FiUpload, FiCamera } from 'react-icons/fi';
-import { SiGoogledrive } from 'react-icons/si';
 import { useNavigate } from 'react-router-dom';
-import Header from '../components/Header'; // ✅ Add this line
+import Header from '../components/Header';
 
 const OptionCard = ({ icon, title, description, buttonText, onClick }) => (
   <div className="bg-white p-8 rounded-xl border border-gray-200 shadow-sm flex flex-col items-center justify-between text-center w-full sm:w-72 h-80">
@@ -22,7 +21,10 @@ const OptionCard = ({ icon, title, description, buttonText, onClick }) => (
 
 const ScanReceipts = () => {
   const fileInputRef = useRef(null);
+  const videoRef = useRef(null);
   const [imagePreview, setImagePreview] = useState(null);
+  const [showCameraModal, setShowCameraModal] = useState(false);
+  const [cameraStream, setCameraStream] = useState(null);
   const navigate = useNavigate();
 
   const handleFileUpload = () => {
@@ -41,50 +43,46 @@ const ScanReceipts = () => {
   const handleCameraOpen = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      const newWindow = window.open('', '_blank', 'width=640,height=480');
-
-      const doc = newWindow.document;
-      doc.body.style.margin = '0';
-      doc.body.style.background = '#000';
-
-      const video = doc.createElement('video');
-      video.srcObject = stream;
-      video.autoplay = true;
-      video.playsInline = true;
-      video.style.width = '100%';
-      doc.body.appendChild(video);
-
-      const captureButton = doc.createElement('button');
-      captureButton.innerText = 'Capture';
-      captureButton.style.cssText =
-        'position:absolute;bottom:20px;left:50%;transform:translateX(-50%);padding:12px 24px;font-size:16px;background:#2196f3;color:white;border:none;border-radius:8px;cursor:pointer;';
-      doc.body.appendChild(captureButton);
-
-      captureButton.onclick = () => {
-        const canvas = doc.createElement('canvas');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const imageUrl = canvas.toDataURL('image/jpeg');
-
-        setImagePreview(imageUrl);
-        canvas.toBlob((blob) => {
-          navigate('/receipt-result', { state: { file: blob } });
-        }, 'image/jpeg');
-
-        stream.getTracks().forEach((track) => track.stop());
-        newWindow.close();
-      };
+      setCameraStream(stream);
+      setShowCameraModal(true);
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
     } catch (err) {
       console.error('Camera access denied:', err);
       alert('Unable to access camera. Please grant permission.');
     }
   };
 
-  const handleGoogleDriveImport = () => {
-    console.log('Google Drive integration coming soon');
+  const handleCapture = () => {
+    const video = videoRef.current;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    const imageUrl = canvas.toDataURL('image/jpeg');
+
+    setImagePreview(imageUrl);
+
+    canvas.toBlob((blob) => {
+      navigate('/receipt-result', { state: { file: blob } });
+    }, 'image/jpeg');
+
+    handleCloseCamera();
   };
+
+  const handleCloseCamera = () => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach((track) => track.stop());
+    }
+    setShowCameraModal(false);
+  };
+
+  useEffect(() => {
+    if (videoRef.current && cameraStream) {
+      videoRef.current.srcObject = cameraStream;
+    }
+  }, [cameraStream]);
 
   const uploadOptions = [
     {
@@ -94,25 +92,18 @@ const ScanReceipts = () => {
       buttonText: 'Click to Upload',
       onClick: handleFileUpload,
     },
-    // {
-    //   icon: <SiGoogledrive className="text-4xl" />,
-    //   title: 'Import from Google Drive',
-    //   description: '(Connect and Select File)',
-    //   buttonText: 'Connect Drive',
-    //   onClick: handleGoogleDriveImport,
-    // },
-    // {
-    //   icon: <FiCamera className="text-blue-800" style={{ fontSize: '44px', strokeWidth: '1.5' }} />,
-    //   title: 'Scan Using Camera',
-    //   description: '(Take a Live Snapshot)',
-    //   buttonText: 'Open Camera',
-    //   onClick: handleCameraOpen,
-    // },
+    {
+      icon: <FiCamera className="text-blue-800" style={{ fontSize: '44px', strokeWidth: '1.5' }} />,
+      title: 'Scan Using Camera',
+      description: '(Take a Live Snapshot)',
+      buttonText: 'Open Camera',
+      onClick: handleCameraOpen,
+    },
   ];
 
   return (
     <>
-      <Header /> {/* ✅ Add this inside the return */}
+      <Header />
       <div className="bg-gray-50 min-h-full flex items-center justify-center p-4">
         <div className="bg-white p-8 sm:p-12 rounded-2xl border border-gray-200 shadow-lg text-center max-w-4xl w-full">
           <h1 className="text-3xl font-bold text-gray-800 mb-2">Scan or Upload Your Receipt</h1>
@@ -140,7 +131,45 @@ const ScanReceipts = () => {
           )}
         </div>
       </div>
+
+      {showCameraModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center">
+          <div className="relative w-full max-w-lg p-4 bg-white rounded-xl shadow-xl">
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              className="w-full rounded-xl"
+              style={{ maxHeight: '400px', objectFit: 'cover' }}
+            />
+            <div className="flex justify-center mt-4 gap-4">
+              <button
+                className="bg-blue-600 text-white px-6 py-2 rounded-lg"
+                onClick={handleCapture}
+              >
+                Capture
+              </button>
+              <button
+                className="bg-red-500 text-white px-6 py-2 rounded-lg"
+                onClick={handleCloseCamera}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
-}
+};
+
 export default ScanReceipts;
+
+
+// {
+//       icon: <SiGoogledrive className="text-4xl" />,
+//       title: 'Import from Google Drive',
+//       description: '(Connect and Select File)',
+//       buttonText: 'Connect Drive',
+//       onClick: handleGoogleDriveImport,
+//     },
