@@ -199,7 +199,7 @@ async def analyze_receipt(
 # ========================== Receipt Pass ===============================
 
 wallet_manager = ReceiptWalletManager()
-
+from google.cloud import firestore
 @app.post("/receipts/create-wallet-pass")
 async def create_wallet_pass(
     request: Request,
@@ -230,7 +230,13 @@ async def create_wallet_pass(
         result = await wallet_manager.create_receipt_pass(receipt_data, uuid)
 
         # Update the Firestore document with the new pass info
-        doc.reference.update({'walletPass': result})
+        doc.reference.update({
+        'walletPass': {
+            'wallet_link': result.get("wallet_link"),
+            'object_id': result.get("object_id"),
+            'createdAt': firestore.SERVER_TIMESTAMP,
+            }
+        })
 
         if result['success']:
             return result
@@ -459,14 +465,18 @@ async def chat_handler(
        
 # ============================= Receipt History ===============================================
 
-# from datetime import datetime
+from datetime import datetime
 
-def serialize_firestore_datetime(data: dict) -> dict:
-    for key, value in data.items():
-        if isinstance(value, datetime):
-            data[key] = value.isoformat()
-    return data
-
+def serialize_firestore_datetime(obj):
+    if isinstance(obj, dict):
+        return {k: serialize_firestore_datetime(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [serialize_firestore_datetime(item) for item in obj]
+    elif isinstance(obj, datetime):
+        return obj.isoformat()
+    else:
+        return obj
+    
 @app.get("/receipts/user/{user_id}")
 async def get_user_receipts(
     user_id: str,
@@ -480,9 +490,6 @@ async def get_user_receipts(
         receipts = []
         for doc in docs:
             receipt_data = doc.to_dict()
-            receipt_data["receiptId"] = doc.id
-
-            # Convert Firestore datetime fields to ISO string
             serialized = serialize_firestore_datetime(receipt_data)
             receipts.append(serialized)
 
@@ -529,6 +536,32 @@ async def delete_receipt(
         logging.error(f"Error deleting receipt {receipt_id}: {e}")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Failed to delete receipt")
+
+# ============================= Receipt Image URL Creator ===============================================
+
+def generate_signed_url(gcs_path: str, duration_minutes=15) -> str:
+    # Parse GCS path
+    if not gcs_path.startswith("gs://"):
+        raise ValueError("Invalid GCS path")
+    
+    parts = gcs_path[5:].split("/", 1)
+    bucket_name, blob_path = parts[0], parts[1]
+
+    client = storage.Client()
+    bucket = client.bucket(bucket_name)
+    blob = bucket.blob(blob_path)
+
+    url = blob.generate_signed_url(
+        expiration=timedelta(minutes=duration_minutes),
+        method="GET",
+        version="v4"
+    )
+    return url
+
+@app.get("/get-signed-url")
+async def get_signed_url(gcs_path: str):
+    url = generate_signed_url(gcs_path)
+    return {"signed_url": url}
 
 
 @app.post("/orchestrator/query")
