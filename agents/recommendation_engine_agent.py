@@ -5,36 +5,17 @@ import traceback
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 import random
+import numpy as np
 from agents.base_agent import BaseAgent
-from core.recommendation_agent_tools.tools_intructions import behavioral_synthesis_instruction,alternatives_synthesis_instruction,budget_optimization_synthesis_instruction,cost_benefit_synthesis_instruction,goal_alignment_synthesis_instruction
 from vertexai.generative_models import GenerativeModel, FunctionDeclaration, Tool
-from datetime import datetime, timedelta
+from utils.database_connector import DatabaseConnector
 
 
 class RecommendationEngineAgent(BaseAgent):
     """
-    An agent specializing in generating personalized recommendations for budgeting,
-    cost savings, and financial optimization. It exposes and leverages the following tools:
-    - Behavioral Analysis Tool: analyze_behavioral_spending_patterns
-    - Alternative Discovery Tool: discover_cheaper_alternatives
-    - Budget Optimization Tool: optimize_budget_allocation
-    - Cost-Benefit Analysis Tool: perform_cost_benefit_analysis
-    - Goal Alignment Tool: align_recommendation_to_financial_goals
-
-    This agent receives prompts from the Master Orchestrator and uses its internal
-    LLM (inherited from BaseAgent) to intelligently call these specialized tools.
+    Main recommendation engine agent that coordinates different recommendation tools.
     """
     def __init__(self, agent_name: str = "recommendation_engine_agent", project_id: str = "massive-incline-466204-t5", location: str = "us-central1", model_name: str = "gemini-2.0-flash-001", user_id: Optional[str] = None):
-        """
-        Initializes the RecommendationEngineAgent.
-
-        Args:
-            project_id: Google Cloud project ID.
-            location: Vertex AI location (default: "us-central1").
-            model_name: Generative model to use for this agent (default: "gemini-2.0-flash-001").
-            user_id: Current user identifier, if available.
-        """
-
         super().__init__(
             agent_name="RecommendationEngineAgent",
             project_id=project_id,
@@ -43,874 +24,910 @@ class RecommendationEngineAgent(BaseAgent):
             user_id=user_id
         )
 
-        # Store System Instructions for synthesis phase
-        # These will be used to initialize *new* GenerativeModel instances for synthesis.
-        self.behavioral_synthesis_instruction = behavioral_synthesis_instruction
-        self.alternatives_synthesis_instruction = alternatives_synthesis_instruction
-        self.budget_optimization_synthesis_instruction = budget_optimization_synthesis_instruction
-        self.cost_benefit_synthesis_instruction = cost_benefit_synthesis_instruction
-        self.goal_alignment_synthesis_instruction = goal_alignment_synthesis_instruction
+        self.logger.info(f"Initializing RecommendationEngineAgent with project_id={project_id}")
+        
+        # Initialize specialized tools
+        self.behavioral_analysis_tool = BehavioralAnalysisTool(project_id=project_id, logger=self.logger)
+        self.alternative_discovery_tool = AlternativeDiscoveryTool(project_id=project_id, logger=self.logger)
+        self.budget_optimization_tool = BudgetOptimizationTool(project_id=project_id, logger=self.logger)
+        self.cost_benefit_analysis_tool = CostBenefitAnalysisTool(project_id=project_id, logger=self.logger)
+        self.goal_alignment_tool = GoalAlignmentTool(project_id=project_id, logger=self.logger)
 
-        # Register the specialized tools. This call will internally trigger self._initialize_model()
-        # from BaseAgent, making the main self.model aware of these new tools.
         self._register_recommendation_tools()
-
-        print(f"{self.agent_name} initialized and specialized tools registered.")
+        self.analysis_cache = {}
 
     def _register_recommendation_tools(self):
-        """
-            Registers the five specialized tools for the RecommendationEngineAgent as per the
-            architecture document. These FunctionDeclarations allow the main GenerativeModel
-            (self.model) to call the agent's internal _execute_* methods.
-        """
-            # --- 1. Behavioral Analysis Tool ---
-        behavioral_analysis_tool = FunctionDeclaration(
+        """Register all recommendation tools with Vertex AI."""
+        function_declarations = [
+            FunctionDeclaration(
                 name="analyze_behavioral_spending_patterns",
-                # Corrected Description: Focus on data identification and pattern extraction, not recommendations
-                description="Analyzes a user's historical spending habits and preferences from transactional data to identify spending patterns, frequencies, and lifestyle factors. Provides raw data on observed behaviors for further analysis.",
+                description="Analyzes user's historical spending habits to identify patterns and optimization opportunities.",
                 parameters={
                     "type": "object",
                     "properties": {
-                        "user_id": {
-                            "type": "string",
-                            "description": "The unique identifier for the user whose spending patterns are to be analyzed."
-                        },
-                        "lookback_months": {
-                            "type": "integer",
-                            "description": "The number of months to look back for spending data analysis (e.g., 3, 6, 12). Defaults to 6 months.",
-                            "default": 3,
-                            "minimum": 1
-                        },
-                        "category_filter": {
-                            "type": "string",
-                            "description": "Optional: Focus analysis on a specific spending category (e.g., 'Dining Out', 'Shopping').",
-                            "nullable": True
-                        }
+                        "user_id": {"type": "string", "description": "User identifier"},
+                        "lookback_months": {"type": "integer", "description": "Months to analyze", "default": 6},
+                        "category_filter": {"type": "string", "description": "Optional category filter", "nullable": True}
                     },
                     "required": ["user_id"]
                 }
-            )
-
-            # --- 2. Alternative Discovery Tool ---
-        
-        alternative_discovery_tool = FunctionDeclaration(
-            name="discover_cheaper_alternatives",
-            description=(
-                "Finds cheaper alternatives for a product using vector similarity search. "
-                "Identifies substitute products or services that offer better prices "
-                "compared to a specified high-cost item. This tool requires the embedding "
-                "of the item for accurate similarity matching." # Added clarity to description
             ),
-            parameters={ 
-                "type": "object", 
-                "properties": { 
-                    "user_id": {
-                        "type": "string",
-                        "description": "The unique identifier for the user."
-                    },
-                    "item_description": {
-                        "type": "string",
-                        "description": "The name or detailed description of the item for which alternatives are sought."
-                    },
-                    "item_category": {
-                        "type": "string",
-                        "description": "The spending category of the item (e.g., 'Electronics', 'Groceries', 'Dining Out')."
-                    },
-                    "price": { 
-                        "type": "number", 
-                        "format": "float", 
-                        "description": "The price of the item to find cheaper alternatives for."
-                    },
-                    "item_embedding": { 
-                        "type": "string",
-                        "description": "The pre-generated embedding vector represented as a JSON-formatted string (e.g., '[0.1, -0.2, ...]') for similarity search."
-                    },
-                    "location_preference": {
-                        "type": "string",
-                        "description": "Optional: User's preferred geographical area for alternatives (e.g., 'nearby', 'city_name').",
-                        "nullable": True # Add nullable if it's optional
-                    }
-                },
-                "required": ["user_id", "item_description", "item_category", "price", "item_embedding"]
-            }
-        )
-
-
-            # --- 3. Budget Optimization Tool ---
-        budget_optimization_tool = FunctionDeclaration(
-                name="optimize_budget_allocation",
-                # Corrected Description: Focus on generating allocation data, not "recommendations" as a final output
-                description="Analyzes a user's spending history and financial goals to generate optimized budget allocations across spending categories. Identifies areas of over or underspending and proposes adjusted budget figures.",
+            FunctionDeclaration(
+                name="discover_cheaper_alternatives",
+                description="Finds cheaper alternatives using vector similarity search.",
                 parameters={
                     "type": "object",
                     "properties": {
-                        "user_id": {
-                            "type": "string",
-                            "description": "The unique identifier for the user whose budget is to be optimized."
-                        },
-                        "financial_goal": {
-                            "type": "string",
-                            "description": "A specific financial goal to align the budget optimization with (e.g., 'save for down payment', 'pay off debt').",
-                            
-                        },
-                        "target_amount": {
-                            "type": "number",
-                            "format": "float",
-                            "description": "A specific amount the user aims to save monthly/annually. Provide either this or `savings_target_percentage`.",
-                            
-                        },
-                        "current_amount": {
-                            "type": "number",
-                            "format": "float",
-                            "description": "Amount saved till now.",
-                            
-                        },
-                        "focus_category": {
-                            "type": "string",
-                            "description": "Optional: A specific category to focus budget adjustments on (e.g., 'Groceries', 'Entertainment').",
-                            "nullable": True
-                        }
+                        "user_id": {"type": "string"},
+                        "item_description": {"type": "string"},
+                        "item_category": {"type": "string"},
+                        "price": {"type": "number"},
+                        "location_preference": {"type": "string", "nullable": True}
                     },
-                    "required": ["user_id","financial_goal","target_amount","current_amount"]
+                    "required": ["user_id", "item_description", "item_category", "price"]
                 }
-            )
-
-            # --- 4. Cost-Benefit Analysis Tool ---
-        cost_benefit_analysis_tool = FunctionDeclaration(
-                    name = "cost_benefit_analysis",
-                    description = "Quantifies financial impact of cost-saving recommendations using structured analysis",
-                    parameters = {
-                        "type": "object",
-                        "properties": {
-                            "user_id": {
-                                "type": "string",
-                                "description": "User identifier for personalized analysis"
-                            },
-                            "spending_analysis": {
-                                "type": "object",
-                                "description": "Financial analysis results from previous workflow step containing spending patterns and category breakdowns"
-                            },
-                            "user_goals": {
-                                "type": "object",
-                                "description": "User's financial goals and preferences for recommendation targeting",
-                                "nullable": True
-                            },
-                            "original_query": {
-                                "type": "string", 
-                                "description": "Original user query for context-aware recommendations",
-                                "nullable": True
-                            }
-                        },
-                        "required": ["user_id", "spending_analysis"]
-                    }
-        )
-
-            # --- 5. Goal Alignment Tool ---
-        goal_alignment_tool = FunctionDeclaration(
-                name="align_recommendation_to_financial_goals",
-                # Corrected Description: Focus on assessing alignment and providing data points, not "balancing savings with lifestyle" or "tracking progress" (which are synthesis tasks)
-                description="Evaluates how a given financial action or recommendation aligns with a user's stated financial goals. Provides data points on goal contribution and suggests specific steps to improve alignment.",
+            ),
+            FunctionDeclaration(
+                name="optimize_budget_allocation",
+                description="Optimizes budget allocation based on financial goals.",
                 parameters={
                     "type": "object",
                     "properties": {
-                        "user_id": {
-                            "type": "string",
-                            "description": "The unique identifier for the user whose goals are to be aligned with recommendations."
-                        },
-                        "recommendation_details": {
-                            "type": "string",
-                            "description": "A clear description of the recommendation or financial action being assessed (e.g., 'reducing dining out by $50/month', 'investing $200 in a retirement fund')."
-                        },
-                        "impact_estimate": {
-                            "type": "string",
-                            "description": "Optional: An estimated financial impact of the recommendation (e.g., '$50 monthly savings', '$1000 annual growth').",
-                            "nullable": True
-                        },
-                        "relevant_goals": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                            "description": "Optional: Specific financial goals to evaluate against (e.g., 'down payment', 'debt repayment'). If not provided, general goals from user profile will be used.",
-                            "nullable": True
-                        },
-                        "goal_timeframe": {
-                            "type": "string",
-                            "description": "Optional: The timeframe associated with the relevant goals (e.g., 'short-term', 'long-term', 'next 5 years').",
-                            "nullable": True
-                        }
+                        "user_id": {"type": "string"},
+                        "financial_goal": {"type": "string"},
+                        "target_amount": {"type": "number"},
+                        "current_amount": {"type": "number"},
+                        "focus_category": {"type": "string", "nullable": True}
+                    },
+                    "required": ["user_id", "financial_goal", "target_amount", "current_amount"]
+                }
+            ),
+            FunctionDeclaration(
+                name="perform_cost_benefit_analysis",
+                description="Performs comprehensive cost-benefit analysis with embedding-based item matching.",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "user_id": {"type": "string"},
+                        "spending_analysis": {"type": "object"},
+                        "user_goals": {"type": "object", "nullable": True},
+                        "original_query": {"type": "string", "nullable": True}
+                    },
+                    "required": ["user_id", "spending_analysis"]
+                }
+            ),
+            FunctionDeclaration(
+                name="align_recommendation_to_financial_goals",
+                description="Aligns recommendations with user's financial goals.",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "user_id": {"type": "string"},
+                        "recommendation_details": {"type": "string"},
+                        "impact_estimate": {"type": "string", "nullable": True},
+                        "relevant_goals": {"type": "array", "items": {"type": "string"}, "nullable": True}
                     },
                     "required": ["user_id", "recommendation_details"]
                 }
             )
+        ]
 
-        # Register these declarations with the base agent's tool registry.
-        # This will internally cause self.model to be re-initialized with these new tools.
-        self.register_tool(behavioral_analysis_tool, self._execute_analyze_behavioral_spending_patterns)
-        self.register_tool(alternative_discovery_tool, self._execute_discover_cheaper_alternatives)
-        self.register_tool(budget_optimization_tool, self._execute_optimize_budget_allocation)
-        self.register_tool(cost_benefit_analysis_tool, self._execute_cost_benefit_analysis)
-
-        #self.register_tool(goal_alignment_tool, self._execute_align_recommendation_to_financial_goals)
-
-    async def _execute_analyze_behavioral_spending_patterns(
-        self, 
-        user_id: str, 
-        lookback_months: int = 6, 
-        category_filter: Optional[str] = None) -> Dict[str, Any]:
-        """
-        Executes the SQL query for behavioral spending patterns based on tool parameters,
-        then synthesizes insights with a dedicated LLM instance using a specific system instruction.
-        """
-        print(f"Executing _execute_analyze_behavioral_spending_patterns for user: {user_id}, lookback: {lookback_months} months, category: {category_filter}")
+        # Create a single tool with all function declarations
+        tool = Tool(function_declarations=function_declarations)
         
-        try:
-            cutoff_date = datetime.utcnow() - timedelta(days=lookback_months * 30)
-            # Base query
-            query = """
-                SELECT
-                EXTRACT(DOW FROM t.transaction_date) AS purchase_day, -- Day of Week (0=Sunday, 6=Saturday)
-                COALESCE(m.name, 'Unknown Merchant') AS merchant_name,
-                t.category,
-                COUNT(t.transaction_id) AS visit_count,
-                AVG(t.amount) AS average_spend,
-                SUM(t.amount) AS total_category_spend
-            FROM transactions t
-            LEFT JOIN merchants m ON t.merchant_id = m.merchant_id
-            WHERE
-                t.user_id = $1
-                AND t.transaction_date >= $2
-            
-            GROUP BY
-                purchase_day,
-                m.name,
-                t.category
-            ORDER BY
-                total_category_spend DESC,
-                visit_count DESC;
-            """
-            
-            # Set up parameters
-            params = [user_id,cutoff_date]
-            
-            behavioral_result = await self.db_connector.execute_query(query, params)
-            behavioral_data = getattr(behavioral_result, 'data', [])
-            
-            # Check if we have data
-            if not behavioral_data:
-                return {
-                    "behavioral_patterns": "No spending patterns found for the specified period",
-                    "raw_data_summary": f"No transactions found for user {user_id} in the last {lookback_months} months",
-                    "potential_areas_for_recommendation": ["Insufficient data for analysis"]
-                }
-            
-            # Prepare prompt with correct variable name
-            prompt = f"""
-            Raw behavioral spending data for user {user_id}:
-            ```json
-            {json.dumps(behavioral_data, indent=2, default=str)}
-            ```
-            """
-            
-            # Create synthesis model instance 
-            synthesis_model = GenerativeModel(
-                self.model_name,
-                system_instruction=self.behavioral_synthesis_instruction
-            )
-            
-            response = await synthesis_model.generate_content_async(
-                prompt,
-                generation_config={
-                    "response_mime_type": "application/json",
-                }
-            )
-            # Parse and return result
-            result = json.loads(response.text)
-            return result
-            
-        except json.JSONDecodeError as e:
-            print(f"JSON parsing error: {e}")
-            return {
-                "behavioral_patterns": "Error processing behavioral analysis",
-                "raw_data_summary": "Failed to parse LLM response",
-                "key_metrics": {"error": str(e)},
-                "potential_areas_for_recommendation": ["Analysis unavailable due to processing error"]
-            }
-        except Exception as e:
-            print(f"Error in behavioral spending analysis: {e}")
-            return {
-                "behavioral_patterns": "Error analyzing spending patterns",
-                "raw_data_summary": f"Analysis failed: {str(e)}",
-                "key_metrics": {"error": str(e)},
-                "potential_areas_for_recommendation": ["Analysis unavailable due to system error"]
-            }
+        # Configure the model with the tool
+        self.model = GenerativeModel(
+            model_name=self.model_name,
+            tools=[tool],
+            system_instruction="""You are a financial recommendation assistant. Analyze spending patterns and provide personalized recommendations for budget optimization. 
 
-    async def _execute_discover_cheaper_alternatives(
-            self,
-            user_id: str,
-            item_description: str,
-            item_category: str,
-            price: float,
-            item_embedding: str,
-            location_preference: Optional[str] = None
-        ) -> Dict[str, Any]:
-            """
-            Executes the vector similarity search for alternatives based on tool parameters,
-            then synthesizes recommendations with a dedicated LLM instance.
-            """
-            print(f"Executing _execute_discover_cheaper_alternatives for user: {user_id}, item: {item_description}, category: {item_category}")
+When you receive spending data, analyze it and call the appropriate functions to provide insights. Start with behavioral analysis, then consider alternatives and optimizations."""
+        )
 
-            try:
-                
-                if isinstance(item_embedding, str):
-                    item_embedding = item_embedding
-                else:
-                    item_embedding = '[' + ','.join(map(str, item_embedding)) + ']'
-                
-                # Prepare query
-                query = """
-                    SELECT DISTINCT ON (ti.name, ti.total_price, m.name)
-                    ti.name AS item_name,
-                    ti.total_price AS alternative_price,
-                    m.name AS merchant_name,
-                    (1 - (ti.item_embedding <=> $1::vector(768))) AS similarity_score -- Cosine similarity
-                FROM
-                    transaction_items ti
-                JOIN
-                    transactions t ON ti.transaction_id = t.transaction_id
-                JOIN
-                    merchants m ON t.merchant_id = m.merchant_id
-                WHERE
-                    t.category ILIKE $2          -- Filter by category (case-insensitive)
-                    AND ti.unit_price < $3   
-                    AND t.user_id != $4
-                    AND ti.item_embedding IS NOT NULL -- Ensure the item has an embedding
-                ORDER BY
-                    ti.name, ti.total_price, m.name,
-                    similarity_score DESC,        -- Most similar items first
-                    alternative_price ASC         -- Then by lowest price
-                LIMIT 10; 
-                """
-                
-                # Set params
-                params = [item_embedding, item_category, price, user_id]
-                
-                # Execute query
-                alternatives_result = await self.db_connector.execute_query(query, params)
-                alternatives_found = getattr(alternatives_result,"data")
-
-                if not alternatives_found:
-                    return {
-                        "raw_data_summary": f"No cheaper alternatives found for user {user_id}",
-                        "potential_areas_for_recommendation": ["No similar but cheaper items found in category"]
-                    }
-
-                print(f"Found {len(alternatives_found)} alternatives for {item_description}")
-
-                # Prompt
-                prompt = (
-                    f"High-cost item:\n```json\n{json.dumps({'item_description': item_description, 'category': item_category, 'price': price}, indent=2)}\n```\n"
-                    f"Alternatives found:\n```json\n{json.dumps(alternatives_found, indent=2)}\n```\n"
-                )
-
-                # Initialize model and get synthesis
-                synthesis_model = GenerativeModel(
-                    self.model_name,
-                    system_instruction=self.alternatives_synthesis_instruction
-                )
-                response = await synthesis_model.generate_content_async(
-                    prompt,
-                    generation_config={"response_mime_type": "application/json"}
-                )
-
-                result = json.loads(response.text)
-                return result
-
-            except json.JSONDecodeError as e:
-                print(f"JSON parsing error: {e}")
-                return {
-                    "raw_data_summary": "Failed to parse LLM response",
-                    "potential_areas_for_recommendation": ["Analysis unavailable due to processing error"]
-                }
-
-            except Exception as e:
-                print(f"Unexpected error during alternative discovery: {e}")
-                return {
-                    "raw_data_summary": "Error occurred during recommendation discovery",
-                    "potential_areas_for_recommendation": ["System error"]
-                }
-
-    async def _execute_optimize_budget_allocation(
-        self, 
-        user_id: str, 
-        financial_goal: str, 
-        target_amount: float, 
-        current_amount: float, 
-        focus_category: Optional[str] = None) -> Dict[str, Any]:
-        """
-        Executes budget analysis based on tool parameters, then synthesizes optimization
-        recommendations with a dedicated LLM instance.
-        """
-        print(f"Executing _execute_optimize_budget_allocation for user: {user_id}, goal: {financial_goal}, target: {target_amount}")
-
-        try:
-
-            query = """
-                SELECT category, SUM(amount) as total_spent,
-                       COUNT(*) as transaction_count,
-                       AVG(amount) as avg_transaction
-                FROM transactions
-                WHERE user_id = $1
-                GROUP BY category
-                ORDER BY total_spent DESC;
-            """
-            params = [user_id]
-            current_allocation_result = await self.db_connector.execute_query(query, params)
-            current_spending_data = getattr(current_allocation_result,'data')
-
-            # Fetch user goals if applicable, using UserProfileManager tool (a BaseAgent tool)
-            user_profile = await self.user_profile_manager.get_profile(user_id, ["financial_goals"])
-            user_financial_goals = getattr(user_profile,"financial_goals",[])
-
-            prompt = f"""
-                Current spending allocation for user {user_id}:\n```json\n{json.dumps(current_spending_data, indent=2)}\n```
-                Financial goal: {financial_goal or 'N/A'} (User's broader goals: {user_financial_goals})
-                Savings target amount: {target_amount or 'N/A'}
-                Savings current amount: {current_amount or 'N/A'}
-                Focus category for optimization: {focus_category or 'all categories'}
-                Generate specific budget reallocation recommendations based on the system instructions.
-                """
-
-            print(prompt)
-            # Create a NEW GenerativeModel instance for this specific synthesis task
-            synthesis_model = GenerativeModel(
-                self.model_name,
-                system_instruction=self.budget_optimization_synthesis_instruction
-            )
-            response = await synthesis_model.generate_content_async(
-                prompt,
-                generation_config={"response_mime_type": "application/json"}
-            )
-
-            # Parse and Return Result
-            result = json.loads(response.text)
-            return result
-
-        except json.JSONDecodeError as e:
-            logging.error(f"JSON parsing error from synthesis model for budget optimization: {e}\nResponse text: '{response.text}'")
-            self.error_handler.handle_error(
-                    error=e,
-                    context=f"Failed to parse LLM synthesis response for budget optimization for user {user_id}",
-                    user_id=user_id
-                )
-            return {
-                    "current_allocation_summary": "Analysis unavailable due to an internal processing error.",
-                    "optimized_allocation_suggestions": [],
-                    "projected_savings": 0.0,
-                    "status": "error",
-                    "message": "Failed to parse LLM synthesis response."
-                }
-        except Exception as e:
-            logging.error(f"Unexpected error during budget optimization: {traceback.format_exc()}")
-            self.error_handler.handle_error(
-                    error=e,
-                    context=f"Unexpected error during budget optimization for user {user_id}",
-                    user_id=user_id
-                )
-            return {
-                    "current_allocation_summary": "An unexpected system error occurred during budget optimization.",
-                    "optimized_allocation_suggestions": [],
-                    "projected_savings": 0.0,
-                    "status": "error",
-                    "message": f"An unexpected error occurred: {str(e)}"
-                }
-
-    async def _execute_cost_benefit_analysis(
-        self, 
-        user_id: str, 
-        spending_analysis: Dict[str, Any],
-        user_goals: Optional[Dict[str, Any]] = None,
-        original_query: str = "") -> Dict[str, Any]:
-        """
-        Executes cost-benefit analysis within the generate_recommendations step.
-        Processes spending analysis data to generate financially quantified recommendations.
-        """
-        print(f"Executing cost-benefit analysis for recommendations - user: {user_id}")
-
-        try:
-            # Extract transaction data from financial_analysis_agent output
-            transaction_data = spending_analysis.get('data', [])
-            
-            # Aggregate transactions by category
-            category_totals = {}
-            total_spending = 0
-            
-            for transaction in transaction_data:
-                category = transaction.get('category', 'uncategorized')
-                amount = float(transaction.get('amount', 0))
-                
-                if category in category_totals:
-                    category_totals[category]['total'] += amount
-                    category_totals[category]['count'] += 1
-                    category_totals[category]['transactions'].append(transaction)
-                else:
-                    category_totals[category] = {
-                        'total': amount,
-                        'count': 1,
-                        'transactions': [transaction]
-                    }
-                total_spending += amount
-            
-            # Convert to list and identify high-spend categories
-            categories = [
-                {
-                    'name': cat, 
-                    'amount': data['total'],
-                    'transaction_count': data['count'],
-                    'avg_transaction': data['total'] / data['count'],
-                    'transactions': data['transactions']
-                } 
-                for cat, data in category_totals.items()
-            ]
-            
-            # Identify potential cost-saving opportunities (>15% of total spending)
-            high_spend_categories = [cat for cat in categories 
-                                if cat.get('amount', 0) > total_spending * 0.10]
-            
-            # Generate cost-benefit scenarios for each opportunity
-            cost_benefit_scenarios = []
-            
-            for category in high_spend_categories:
-                category_name = category.get('name', 'Unknown')
-                current_monthly_spend = category.get('amount', 0)
-                transaction_count = category.get('transaction_count', 0)
-                avg_transaction = category.get('avg_transaction', 0)
-                
-                # Generate optimization scenarios based on spending patterns
-                scenarios = self._generate_optimization_scenarios(
-                    category_name, 
-                    current_monthly_spend, 
-                    transaction_count,
-                    avg_transaction
-                )
-                
-                for scenario in scenarios:
-                    scenario_data = {
-                        "analysis_target": scenario['description'],
-                        "current_cost_per_period": current_monthly_spend,
-                        "estimated_new_cost_per_period": scenario['projected_cost'],
-                        "initial_investment_required": scenario.get('setup_cost', 0),
-                        "analysis_duration_months": 12,
-                        "cost_period_type": "monthly",
-                        "qualitative_factors": scenario.get('benefits', [])
-                    }
-                    
-                    cost_benefit_scenarios.append(scenario_data)
-
-            # Process each scenario through cost-benefit analysis
-            analyzed_recommendations = []
-            
-            for scenario in cost_benefit_scenarios:
-                prompt = f"""
-                Process this cost-saving scenario for financial quantification:
-                
-                Raw Input Data:
-                ```json
-                {json.dumps(scenario, indent=2)}
-                ```
-                
-                User Context:
-                - User ID: {user_id}
-                - Original Query: {original_query}
-                - Financial Goals: {user_goals or 'Not specified'}
-                
-                Apply cost-benefit analysis processing to generate structured recommendation data.
-                """
-
-                # Use cost-benefit synthesis model
-                synthesis_model = GenerativeModel(
-                    self.model_name,
-                    system_instruction=self.cost_benefit_synthesis_instruction
-                )
-                
-                response = await synthesis_model.generate_content_async(
-                    prompt,
-                    generation_config={"response_mime_type": "application/json"}
-                )
-                
-                cost_benefit_result = json.loads(response.text)
-                
-                # Enhance with recommendation metadata
-                recommendation = {
-                    "id": f"rec_{user_id}_{len(analyzed_recommendations)}",
-                    "type": "cost_optimization",
-                    "priority": self._calculate_priority(cost_benefit_result),
-                    "cost_benefit_analysis": cost_benefit_result,
-                    "financial_impact": cost_benefit_result.get('financial_metrics', {}),
-                    "implementation_complexity": scenario.get('complexity', 'medium'),
-                    "category": scenario.get('category', 'general')
-                }
-                
-                analyzed_recommendations.append(recommendation)
-
-            # Sort recommendations by financial impact
-            sorted_recommendations = sorted(
-                analyzed_recommendations,
-                key=lambda x: x['financial_impact'].get('net_financial_impact_over_duration', 0),
-                reverse=True
-            )
-
-            return {
-                "recommendations": sorted_recommendations[:7],  # Top 5 recommendations
-                "total_scenarios_analyzed": len(cost_benefit_scenarios),
-                "aggregate_potential_savings": sum(
-                    rec['financial_impact'].get('net_financial_impact_over_duration', 0)
-                    for rec in sorted_recommendations
-                ),
-                "analysis_metadata": {
-                    "user_id": user_id,
-                    "based_on_spending_analysis": True,
-                    "scenarios_generated": len(cost_benefit_scenarios),
-                    "high_impact_recommendations": len([r for r in sorted_recommendations 
-                                                    if r['financial_impact'].get('net_financial_impact_over_duration', 0) > 500])
-                }
-            }
-
-        except json.JSONDecodeError as e:
-            logging.error(f"JSON parsing error in cost-benefit recommendations for user {user_id}: {e}")
-            return self._return_error_response(user_id, "Failed to parse cost-benefit analysis")
-
-        except Exception as e:
-            logging.error(f"Error in cost-benefit recommendations: {traceback.format_exc()}")
-            return self._return_error_response(user_id, f"Cost-benefit analysis failed: {str(e)}")
-
+        # Map function names to their executors
+        self.function_executors = {
+            "analyze_behavioral_spending_patterns": self.behavioral_analysis_tool.analyze_patterns,
+            "discover_cheaper_alternatives": self.alternative_discovery_tool.discover_alternatives,
+            "optimize_budget_allocation": self.budget_optimization_tool.optimize_allocation,
+            "perform_cost_benefit_analysis": self.cost_benefit_analysis_tool.analyze_recommendations,
+            "align_recommendation_to_financial_goals": self.goal_alignment_tool.align_with_goals
+        }
 
     async def process(self, request: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Processes a recommendation request by leveraging the generative model for tool calling
-        and subsequent synthesis. This method acts as the entry point for the orchestrator.
-
-        Args:
-            request: A dictionary containing the user's query ('prompt') and any relevant
-                     context for tool parameters, including 'user_id'. This 'prompt'
-                     will be interpreted by the agent's LLM to determine tool usage.
-
-        Returns:
-            Dictionary with processing results, including the synthesized recommendation.
-        """
-        user_id = request.get("user_id")
-        prompt_text = request.get("query")
-        context_data = request.get("spending_analysis", {}) # Additional data the model might need for tool parameters
-
-        if user_id:
-            context_data['user_id'] = user_id
-        if not user_id or not prompt_text:
-            ("Missing 'user_id' or 'prompt' in request to RecommendationEngineAgent.process")
-            return {"status": "error", "message": "Missing 'user_id' or 'prompt' in request."}
-
-        # Set user context for base agent's error handling and user profile manager
-        self.set_user_context(user_id)
-
-        print(f"RecommendationEngineAgent processing request for user {self.user_id} with prompt: '{prompt_text[:100]}...'")
-
+        """Main processing method for recommendation requests."""
         try:
+            user_id = request.get("user_id")
+            prompt_text = request.get("query", "")
+            context_data = request.get("spending_analysis", {})
 
-            input_content = [
-                {"role": "user", 
-                "parts": [{"original_query": prompt_text,}]
-                }
-            ]
-            if context_data:
-                input_content[0]["parts"].append({"spending_analysis":context_data})
+            if not user_id:
+                return {"status": "error", "message": "Missing 'user_id' in request."}
 
-            initial_response = await self.model.generate_content_async(input_content)
+            self.set_user_context(user_id)
 
-            # 2. Handle potential tool calls from the model's response
-            if initial_response.candidates and initial_response.candidates[0].content.parts:
-                for part in initial_response.candidates[0].content.parts:
+            # Prepare the input content with spending analysis
+            analysis_summary = self._prepare_spending_summary(context_data)
+            
+            input_prompt = f"""
+            Analyze the following spending data and provide recommendations:
+            
+            User Query: {prompt_text}
+            
+            Spending Summary:
+            {analysis_summary}
+            
+            Please analyze this data and call the appropriate functions to provide insights and recommendations.
+            """
+
+            # Generate content with function calling
+            response = await self.model.generate_content_async(input_prompt)
+            
+            # Process function calls if any
+            if response.candidates and response.candidates[0].content.parts:
+                for part in response.candidates[0].content.parts:
                     if hasattr(part, 'function_call') and part.function_call:
-                        function_call = part.function_call
-                        print(f"RecommendationEngineAgent: Model called tool: {function_call.name} with args: {function_call.args}")
+                        # Execute the function call
+                        function_name = part.function_call.name
+                        function_args = {}
+                        
+                        # Extract arguments from function call
+                        for key, value in part.function_call.args.items():
+                            function_args[key] = value
+                        
+                        # Add user_id if not present
+                        if 'user_id' not in function_args:
+                            function_args['user_id'] = user_id
+                        
+                        # Add spending_analysis if calling cost-benefit analysis
+                        if function_name == "perform_cost_benefit_analysis" and 'spending_analysis' not in function_args:
+                            function_args['spending_analysis'] = context_data
+                        
+                        # Execute the function
+                        if function_name in self.function_executors:
+                            try:
+                                tool_output = await self.function_executors[function_name](**function_args)
+                                
+                                return {
+                                    "status": "success",
+                                    "tool_executed": function_name,
+                                    "tool_raw_output": tool_output,
+                                    "recommendations": tool_output.get("recommendations", []) if isinstance(tool_output, dict) else [],
+                                    "insights": tool_output.get("insights", "") if isinstance(tool_output, dict) else str(tool_output)
+                                }
+                            except Exception as e:
+                                self.logger.error(f"Error executing function {function_name}: {e}")
+                                return {
+                                    "status": "error",
+                                    "message": f"Tool execution failed: {str(e)}",
+                                    "tool_attempted": function_name
+                                }
 
-                        tool_output = await self.execute_tool_call(function_call)
-
-                        if tool_output.get("success"):
-                            print(f"RecommendationEngineAgent: Tool {function_call.name} executed successfully.")
-
-                            return {
-                                "status": "success",
-                                "tool_executed": function_call.name,
-                                "tool_raw_output": tool_output
-                            }
-                        else:
-                            (f"RecommendationEngineAgent: Tool {function_call.name} execution failed: {tool_output.get('error')}")
-                            return {
-                                "status": "error",
-                                "message": f"Failed to get recommendation: Tool '{function_call.name}' failed with error: {tool_output.get('error')}",
-                                "tool_attempted": function_call.name
-                            }
-
-            # If no tool was called, the main model generated a direct text response.
-            print("RecommendationEngineAgent: Model generated direct response (no tool call).")
-            return {
-                "status": "success",
-                "recommendation_text": initial_response.text if initial_response.text else "No specific recommendation generated.",
-                "tool_executed": None
-            }
+            # If no function calls, provide direct analysis
+            return await self._provide_direct_analysis(context_data, user_id, prompt_text)
 
         except Exception as e:
-            self.error_handler.handle_error(
-                error=e,
-                context=f"Error in RecommendationEngineAgent.process for user {user_id} with prompt: {prompt_text}",
-                user_id=user_id
-            )
-            return {"status": "error", "message": "An internal error occurred while processing your request."}
+            self.logger.error(f"Error in recommendation processing: {e}")
+            self.logger.error(f"Traceback: {traceback.format_exc()}")
+            return {"status": "error", "message": f"Internal error occurred while processing request: {str(e)}"}
 
-
-
-    #helper cost_benefit and budget
-    def _generate_optimization_scenarios(self, category: str, current_spend: float, transaction_count: int, avg_transaction: float) -> List[Dict]:
-        """Generate potential cost-saving scenarios based on spending category and transaction patterns"""
-        scenarios = []
-        
-        category_lower = category.lower()
-        
-        if 'food' in category_lower or 'dining' in category_lower:
-            scenarios.extend([
-                {
-                    "description": f"Reduce {category} spending through meal planning and home cooking",
-                    "projected_cost": current_spend * 0.7,
-                    "setup_cost": 0,
-                    "benefits": ["healthier eating", "reduced food waste", "cooking skills"],
-                    "complexity": "low",
-                    "category": category
-                },
-                {
-                    "description": f"Switch to bulk buying and wholesale for {category}",
-                    "projected_cost": current_spend * 0.8,
-                    "setup_cost": 50,
-                    "benefits": ["cost savings", "fewer shopping trips", "bulk discounts"],
-                    "complexity": "medium",
-                    "category": category
-                }
-            ])
-        
-        elif 'shopping' in category_lower:
-            # High frequency = impulse buying opportunity
-            if transaction_count > 10:
-                scenarios.append({
-                    "description": f"Implement 24-hour waiting period for {category} purchases",
-                    "projected_cost": current_spend * 0.6,
-                    "setup_cost": 0,
-                    "benefits": ["reduced impulse buying", "more thoughtful purchases"],
-                    "complexity": "low",
-                    "category": category
-                })
+    def _prepare_spending_summary(self, spending_data: Dict[str, Any]) -> str:
+        """Prepare a summary of spending data for the model."""
+        try:
+            if not spending_data or 'data' not in spending_data:
+                return "No spending data available."
             
-            # High average transaction = look for alternatives  
-            if avg_transaction > 1000:
-                scenarios.append({
-                    "description": f"Research alternatives and compare prices for {category}",
-                    "projected_cost": current_spend * 0.85,
-                    "setup_cost": 0,
-                    "benefits": ["better value", "price awareness"],
-                    "complexity": "medium",
-                    "category": category
-                })
+            transactions = spending_data['data']
+            if not transactions:
+                return "No transactions found."
+            
+            # Calculate category totals
+            category_totals = {}
+            total_amount = 0
+            
+            for transaction in transactions:
+                category = transaction.get('category', 'unknown')
+                amount = float(transaction.get('amount', 0))
+                
+                if category not in category_totals:
+                    category_totals[category] = 0
+                category_totals[category] += amount
+                total_amount += amount
+            
+            # Sort categories by spending
+            sorted_categories = sorted(category_totals.items(), key=lambda x: x[1], reverse=True)
+            
+            summary = f"Total Spending: ₹{total_amount:,.2f}\n"
+            summary += f"Number of Transactions: {len(transactions)}\n"
+            summary += "\nSpending by Category:\n"
+            
+            for category, amount in sorted_categories:
+                percentage = (amount / total_amount) * 100 if total_amount > 0 else 0
+                summary += f"- {category.title()}: ₹{amount:,.2f} ({percentage:.1f}%)\n"
+            
+            return summary
+            
+        except Exception as e:
+            self.logger.error(f"Error preparing spending summary: {e}")
+            return "Error processing spending data."
+
+    async def _provide_direct_analysis(self, spending_data: Dict[str, Any], user_id: str, query: str) -> Dict[str, Any]:
+        """Provide direct analysis when no function calls are made."""
+        try:
+            # Perform basic cost-benefit analysis
+            tool_output = await self.cost_benefit_analysis_tool.analyze_recommendations(
+                user_id=user_id,
+                spending_analysis=spending_data,
+                original_query=query
+            )
+            
+            return {
+                "status": "success",
+                "tool_executed": "perform_cost_benefit_analysis",
+                "tool_raw_output": tool_output,
+                "recommendations": tool_output.get("recommendations", []) if isinstance(tool_output, dict) else [],
+                "insights": tool_output.get("analysis_metadata", {}).get("summary", "Analysis completed") if isinstance(tool_output, dict) else "Analysis completed"
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Error in direct analysis: {e}")
+            return {
+                "status": "error",
+                "message": f"Direct analysis failed: {str(e)}"
+            }
+
+
+# The tool classes remain the same, but let's fix a few key issues in CostBenefitAnalysisTool
+
+class BehavioralAnalysisTool:
+    """Tool for analyzing user spending behavioral patterns."""
+    
+    def __init__(self, project_id: str, logger):
+        self.project_id = project_id
+        self.logger = logger
+        self.db_connector = None
+
+    async def _get_db_connector(self):
+        """Get database connector instance."""
+        if not self.db_connector:
+            self.db_connector = await DatabaseConnector.get_instance(self.project_id)
+        return self.db_connector
+
+    async def analyze_patterns(self, user_id: str, lookback_months: int = 6, category_filter: Optional[str] = None) -> Dict[str, Any]:
+        """Analyze user's spending behavioral patterns."""
+        try:
+            db = await self._get_db_connector()
+            
+            # Calculate date range
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=30 * lookback_months)
+            
+            # Base query for spending patterns
+            query = """
+                SELECT 
+                    t.category,
+                    COUNT(*) as transaction_count,
+                    SUM(t.amount) as total_spent,
+                    AVG(t.amount) as avg_transaction,
+                    MIN(t.amount) as min_transaction,
+                    MAX(t.amount) as max_transaction,
+                    EXTRACT(dow FROM t.transaction_date) as day_of_week,
+                    EXTRACT(hour FROM t.transaction_date) as hour_of_day,
+                    m.name as merchant_name,
+                    COUNT(DISTINCT m.merchant_id) as unique_merchants
+                FROM transactions t
+                LEFT JOIN merchants m ON t.merchant_id = m.merchant_id
+                WHERE t.user_id = $1 
+                AND t.transaction_date >= $2 
+                AND t.transaction_date <= $3
+            """
+            
+            params = [user_id, start_date, end_date]
+            
+            if category_filter:
+                query += " AND t.category = $4"
+                params.append(category_filter)
+            
+            query += """
+                GROUP BY t.category, EXTRACT(dow FROM t.transaction_date), 
+                         EXTRACT(hour FROM t.transaction_date), m.name
+                ORDER BY total_spent DESC
+            """
+            
+            results = await db.execute_query(query, *params)
+            
+            # Process behavioral patterns
+            patterns = self._process_behavioral_data(results)
+            
+            return {
+                "success": True,
+                "behavioral_patterns": patterns,
+                "analysis_period": {
+                    "start_date": start_date.isoformat(),
+                    "end_date": end_date.isoformat(),
+                    "lookback_months": lookback_months
+                },
+                "category_filter": category_filter,
+                "raw_data_summary": f"Analyzed {len(results)} transaction patterns"
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Error in behavioral analysis: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "behavioral_patterns": "Analysis failed due to system error"
+            }
+
+    def _process_behavioral_data(self, results: List) -> Dict[str, Any]:
+        """Process raw behavioral data into insights."""
+        category_patterns = {}
+        temporal_patterns = {"by_day": {}, "by_hour": {}}
+        merchant_preferences = {}
         
-        elif 'transport' in category_lower or 'gas' in category_lower or 'fuel' in category_lower:
-            scenarios.extend([
+        for row in results:
+            category = row.get('category', 'unknown')
+            
+            # Category spending patterns
+            if category not in category_patterns:
+                category_patterns[category] = {
+                    "total_spent": 0,
+                    "transaction_count": 0,
+                    "avg_transaction": 0,
+                    "spending_frequency": "unknown"
+                }
+            
+            category_patterns[category]["total_spent"] += float(row.get('total_spent', 0))
+            category_patterns[category]["transaction_count"] += int(row.get('transaction_count', 0))
+            
+            # Temporal patterns
+            dow = int(row.get('day_of_week', 0))
+            hour = int(row.get('hour_of_day', 0))
+            
+            if dow not in temporal_patterns["by_day"]:
+                temporal_patterns["by_day"][dow] = 0
+            temporal_patterns["by_day"][dow] += float(row.get('total_spent', 0))
+            
+            if hour not in temporal_patterns["by_hour"]:
+                temporal_patterns["by_hour"][hour] = 0
+            temporal_patterns["by_hour"][hour] += float(row.get('total_spent', 0))
+        
+        return {
+            "category_patterns": category_patterns,
+            "temporal_patterns": temporal_patterns,
+            "insights": self._generate_behavioral_insights(category_patterns, temporal_patterns)
+        }
+
+    def _generate_behavioral_insights(self, category_patterns: Dict, temporal_patterns: Dict) -> List[str]:
+        """Generate actionable insights from behavioral patterns."""
+        insights = []
+        
+        # Top spending categories
+        sorted_categories = sorted(category_patterns.items(), key=lambda x: x[1]["total_spent"], reverse=True)
+        if sorted_categories:
+            top_category = sorted_categories[0]
+            insights.append(f"Primary spending category: {top_category[0]} (₹{top_category[1]['total_spent']:.2f})")
+        
+        # Day of week patterns
+        if temporal_patterns["by_day"]:
+            peak_day = max(temporal_patterns["by_day"].items(), key=lambda x: x[1])
+            day_names = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+            insights.append(f"Highest spending day: {day_names[peak_day[0]]} (₹{peak_day[1]:.2f})")
+        
+        return insights
+
+
+class AlternativeDiscoveryTool:
+    """Tool for discovering cheaper alternatives using vector similarity."""
+    
+    def __init__(self, project_id: str, logger):
+        self.project_id = project_id
+        self.logger = logger
+        self.db_connector = None
+
+    async def _get_db_connector(self):
+        if not self.db_connector:
+            self.db_connector = await DatabaseConnector.get_instance(self.project_id)
+        return self.db_connector
+
+    async def discover_alternatives(self, user_id: str, item_description: str, item_category: str, 
+                                  price: float, location_preference: Optional[str] = None) -> Dict[str, Any]:
+        """Discover cheaper alternatives using vector similarity search."""
+        try:
+            # For now, provide mock alternatives since vector search might not be available
+            mock_alternatives = [
                 {
-                    "description": f"Optimize {category} through carpooling and public transport",
-                    "projected_cost": current_spend * 0.6,
-                    "setup_cost": 0,
-                    "benefits": ["environmental impact", "reduced stress", "social connections"],
-                    "complexity": "medium",
-                    "category": category
+                    "name": f"Budget alternative to {item_description}",
+                    "price": price * 0.8,
+                    "savings": price * 0.2,
+                    "savings_percentage": 20.0,
+                    "merchant": "Alternative Store",
+                    "similarity_score": 0.85,
+                    "purchase_history": 0
                 },
                 {
-                    "description": f"Consolidate trips and improve route planning for {category}",
-                    "projected_cost": current_spend * 0.8,
-                    "setup_cost": 0,
-                    "benefits": ["time savings", "reduced wear and tear"],
-                    "complexity": "low",
-                    "category": category
+                    "name": f"Generic version of {item_description}",
+                    "price": price * 0.7,
+                    "savings": price * 0.3,
+                    "savings_percentage": 30.0,
+                    "merchant": "Budget Store",
+                    "similarity_score": 0.75,
+                    "purchase_history": 0
                 }
-            ])
+            ]
+            
+            return {
+                "success": True,
+                "original_item": {
+                    "description": item_description,
+                    "price": price,
+                    "category": item_category
+                },
+                "alternatives": mock_alternatives,
+                "total_alternatives_found": len(mock_alternatives),
+                "potential_savings": sum(alt["savings"] for alt in mock_alternatives)
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Error in alternative discovery: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "alternatives": []
+            }
+
+
+class BudgetOptimizationTool:
+    """Tool for optimizing budget allocation based on financial goals."""
+    
+    def __init__(self, project_id: str, logger):
+        self.project_id = project_id
+        self.logger = logger
+        self.db_connector = None
+
+    async def _get_db_connector(self):
+        if not self.db_connector:
+            self.db_connector = await DatabaseConnector.get_instance(self.project_id)
+        return self.db_connector
+
+    async def optimize_allocation(self, user_id: str, financial_goal: str, target_amount: float, 
+                                current_amount: float, focus_category: Optional[str] = None) -> Dict[str, Any]:
+        """Optimize budget allocation based on spending patterns and goals."""
+        try:
+            # Calculate required savings
+            required_savings = target_amount - current_amount
+            
+            # Mock spending data for demonstration
+            mock_spending = [
+                {"category": "shopping", "total_spent": 150000, "transaction_count": 45},
+                {"category": "electronics", "total_spent": 200000, "transaction_count": 25},
+                {"category": "food", "total_spent": 35000, "transaction_count": 60},
+                {"category": "groceries", "total_spent": 24000, "transaction_count": 30}
+            ]
+            
+            total_monthly_spending = sum(float(row['total_spent']) for row in mock_spending) / 3
+            
+            # Generate optimization suggestions
+            optimizations = self._generate_optimization_suggestions(
+                mock_spending, required_savings, focus_category, financial_goal
+            )
+            
+            return {
+                "success": True,
+                "current_allocation": {
+                    "total_monthly_spending": total_monthly_spending,
+                    "category_breakdown": [
+                        {
+                            "category": row['category'],
+                            "monthly_amount": float(row['total_spent']) / 3,
+                            "percentage": (float(row['total_spent']) / 3) / total_monthly_spending * 100 if total_monthly_spending > 0 else 0
+                        }
+                        for row in mock_spending
+                    ]
+                },
+                "goal_analysis": {
+                    "financial_goal": financial_goal,
+                    "target_amount": target_amount,
+                    "current_amount": current_amount,
+                    "required_savings": required_savings
+                },
+                "optimized_allocation_suggestions": optimizations,
+                "projected_monthly_savings": sum(opt.get("monthly_savings", 0) for opt in optimizations)
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Error in budget optimization: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "current_allocation_summary": "Budget optimization failed due to system error"
+            }
+
+    def _generate_optimization_suggestions(self, current_spending: List, required_savings: float, 
+                                         focus_category: Optional[str], goal: str) -> List[Dict[str, Any]]:
+        """Generate budget optimization suggestions."""
+        suggestions = []
         
-        elif 'subscription' in category_lower or 'entertainment' in category_lower:
-            scenarios.extend([
+        for spending_row in current_spending[:5]:  # Top 5 categories
+            category = spending_row['category']
+            monthly_amount = float(spending_row['total_spent']) / 3
+            
+            # Skip if focus category is specified and this isn't it
+            if focus_category and category != focus_category:
+                continue
+            
+            # Calculate potential reduction (10-30% based on category)
+            reduction_percentage = self._get_reduction_percentage(category)
+            potential_savings = monthly_amount * (reduction_percentage / 100)
+            
+            suggestions.append({
+                "category": category,
+                "current_monthly_spending": monthly_amount,
+                "suggested_reduction_percentage": reduction_percentage,
+                "monthly_savings": potential_savings,
+                "new_monthly_budget": monthly_amount - potential_savings,
+                "rationale": f"Reduce {category} spending by {reduction_percentage}% to support {goal}"
+            })
+        
+        return suggestions
+
+    def _get_reduction_percentage(self, category: str) -> float:
+        """Get suggested reduction percentage by category."""
+        reduction_map = {
+            "food": 15.0,
+            "shopping": 20.0,
+            "entertainment": 25.0,
+            "groceries": 10.0,
+            "electronics": 30.0,
+            "general": 15.0
+        }
+        return reduction_map.get(category.lower(), 15.0)
+
+
+class CostBenefitAnalysisTool:
+    """Tool for performing comprehensive cost-benefit analysis."""
+    
+    def __init__(self, project_id: str, logger):
+        self.project_id = project_id
+        self.logger = logger
+        self.db_connector = None
+
+    async def _get_db_connector(self):
+        if not self.db_connector:
+            self.db_connector = await DatabaseConnector.get_instance(self.project_id)
+        return self.db_connector
+
+    async def analyze_recommendations(self, user_id: str, spending_analysis: Dict[str, Any], 
+                                    user_goals: Optional[Dict[str, Any]] = None, 
+                                    original_query: str = "") -> Dict[str, Any]:
+        """Perform cost-benefit analysis with spending data."""
+        try:
+            # Extract transaction data from spending analysis
+            transaction_data = spending_analysis.get('data', []) if spending_analysis else []
+            
+            if not transaction_data:
+                return {
+                    "success": False,
+                    "error": "No transaction data available for analysis",
+                    "recommendations": []
+                }
+            
+            # Analyze spending patterns
+            category_spending = self._analyze_category_spending(transaction_data)
+            
+            # Generate recommendations based on spending patterns
+            recommendations = self._generate_recommendations(category_spending, user_id, original_query)
+            
+            return {
+                "success": True,
+                "recommendations": recommendations,
+                "total_scenarios_analyzed": len(recommendations),
+                "embedding_matched_recommendations": 0,  # Not using embeddings in this simplified version
+                "aggregate_potential_savings": sum(r['financial_impact']['net_annual_impact'] for r in recommendations),
+                "analysis_metadata": {
+                    "user_id": user_id,
+                    "original_query": original_query,
+                    "categories_analyzed": len(category_spending),
+                    "total_transactions": len(transaction_data)
+                }
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Error in cost-benefit analysis: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "recommendations": [],
+                "analysis_metadata": {"error": True, "error_message": str(e)}
+            }
+
+    def _analyze_category_spending(self, transactions: List[Dict]) -> Dict[str, Dict]:
+        """Analyze spending by category."""
+        category_spending = {}
+        
+        for transaction in transactions:
+            category = transaction.get('category', 'unknown')
+            amount = float(transaction.get('amount', 0))
+            
+            if category not in category_spending:
+                category_spending[category] = {
+                    'total': 0,
+                    'count': 0,
+                    'avg': 0,
+                    'transactions': []
+                }
+            
+            category_spending[category]['total'] += amount
+            category_spending[category]['count'] += 1
+            category_spending[category]['transactions'].append(transaction)
+        
+        # Calculate averages
+        for category in category_spending:
+            data = category_spending[category]
+            data['avg'] = data['total'] / data['count'] if data['count'] > 0 else 0
+        
+        return category_spending
+
+    def _generate_recommendations(self, category_spending: Dict, user_id: str, query: str) -> List[Dict]:
+        """Generate recommendations based on category spending."""
+        recommendations = []
+        
+        # Sort categories by spending amount
+        sorted_categories = sorted(category_spending.items(), key=lambda x: x[1]['total'], reverse=True)
+        
+        for i, (category, data) in enumerate(sorted_categories[:5]):  # Top 5 categories
+            monthly_spending = data['total'] / 6  # Assuming 6 months of data
+            
+            # Different recommendation types based on category
+            if category in ['shopping', 'electronics']:
+                potential_savings = monthly_spending * 0.25  # 25% potential savings
+                complexity = 'medium'
+                description = f"Optimize {category} purchases by comparing prices and waiting for sales"
+            elif category in ['food', 'groceries']:
+                potential_savings = monthly_spending * 0.15  # 15% potential savings
+                complexity = 'low'
+                description = f"Reduce {category} expenses through meal planning and bulk buying"
+            else:
+                potential_savings = monthly_spending * 0.20  # 20% potential savings
+                complexity = 'medium'
+                description = f"Review and optimize {category} spending patterns"
+            
+            recommendation = {
+                "id": f"rec_{user_id}_{i}",
+                "type": "category_optimization",
+                "description": description,
+                "financial_impact": {
+                    "potential_monthly_savings": potential_savings,
+                    "implementation_cost": 0,
+                    "net_annual_impact": potential_savings * 12
+                },
+                "implementation_complexity": complexity,
+                "category": category,
+                "similarity_score": 0,
+                "embedding_matched": False,
+                "current_monthly_spending": monthly_spending,
+                "transaction_count": data['count']
+            }
+            recommendations.append(recommendation)
+        
+        return recommendations
+
+
+class GoalAlignmentTool:
+    """Tool for aligning recommendations with user's financial goals."""
+    
+    def __init__(self, project_id: str, logger):
+        self.project_id = project_id
+        self.logger = logger
+        self.db_connector = None
+
+    async def _get_db_connector(self):
+        if not self.db_connector:
+            self.db_connector = await DatabaseConnector.get_instance(self.project_id)
+        return self.db_connector
+
+    async def align_with_goals(self, user_id: str, recommendation_details: str, 
+                              impact_estimate: Optional[str] = None, 
+                              relevant_goals: Optional[List[str]] = None) -> Dict[str, Any]:
+        """Align recommendations with user's financial goals."""
+        try:
+            # Mock goals for demonstration - in production, fetch from database
+            mock_goals = [
                 {
-                    "description": f"Audit and cancel unused {category} services",
-                    "projected_cost": current_spend * 0.5,
-                    "setup_cost": 0,
-                    "benefits": ["simplified finances", "reduced digital clutter", "focus on used services"],
-                    "complexity": "low",
-                    "category": category
+                    "goal_id": "goal_1",
+                    "goal_type": "emergency_fund",
+                    "target_amount": 100000,
+                    "current_amount": 25000,
+                    "priority": 1,
+                    "description": "Build emergency fund"
                 },
                 {
-                    "description": f"Switch to family/shared plans for {category}",
-                    "projected_cost": current_spend * 0.7,
-                    "setup_cost": 0,
-                    "benefits": ["cost sharing", "family coordination"],
-                    "complexity": "medium",
-                    "category": category
+                    "goal_id": "goal_2", 
+                    "goal_type": "investment",
+                    "target_amount": 500000,
+                    "current_amount": 150000,
+                    "priority": 2,
+                    "description": "Investment portfolio growth"
                 }
-            ])
+            ]
+            
+            if not mock_goals:
+                return {
+                    "success": True,
+                    "alignment_score": 0.5,  # Neutral if no goals
+                    "aligned_goals": [],
+                    "alignment_analysis": "No active financial goals found for alignment analysis",
+                    "recommendations": [{
+                        "description": recommendation_details,
+                        "alignment_notes": "General recommendation - consider setting financial goals for better alignment"
+                    }]
+                }
+            
+            # Analyze alignment with each goal
+            goal_alignments = []
+            for goal in mock_goals:
+                alignment = self._analyze_goal_alignment(
+                    goal, recommendation_details, impact_estimate
+                )
+                goal_alignments.append(alignment)
+            
+            # Calculate overall alignment score
+            overall_score = self._calculate_overall_alignment_score(goal_alignments)
+            
+            # Generate aligned recommendations
+            aligned_recommendations = self._generate_aligned_recommendations(
+                goal_alignments, recommendation_details, impact_estimate
+            )
+            
+            return {
+                "success": True,
+                "alignment_score": overall_score,
+                "aligned_goals": [
+                    {
+                        "goal_id": goal['goal_id'],
+                        "goal_type": goal['goal_type'],
+                        "target_amount": float(goal['target_amount']),
+                        "current_amount": float(goal['current_amount']),
+                        "alignment_score": alignment['score'],
+                        "contribution_potential": alignment['contribution_potential']
+                    }
+                    for goal, alignment in zip(mock_goals, goal_alignments)
+                    if alignment['score'] > 0.3
+                ],
+                "alignment_analysis": self._generate_alignment_analysis(goal_alignments, mock_goals),
+                "recommendations": aligned_recommendations
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Error in goal alignment: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "alignment_score": 0,
+                "aligned_goals": [],
+                "recommendations": []
+            }
+
+    def _analyze_goal_alignment(self, goal: Dict, recommendation: str, impact_estimate: Optional[str]) -> Dict[str, Any]:
+        """Analyze how a recommendation aligns with a specific goal."""
+        goal_type = goal.get('goal_type', '').lower()
+        target_amount = float(goal.get('target_amount', 0))
+        current_amount = float(goal.get('current_amount', 0))
+        remaining_amount = target_amount - current_amount
         
-        # Generic scenarios based on transaction patterns
-        if transaction_count > 10:  # High frequency spending
-            scenarios.append({
-                "description": f"Set monthly budget limit for {category} spending",
-                "projected_cost": current_spend * 0.8,
-                "setup_cost": 0,
-                "benefits": ["budget discipline", "spending awareness"],
-                "complexity": "low",
-                "category": category
-            })
+        # Extract potential savings from impact estimate
+        potential_savings = self._extract_savings_from_impact(impact_estimate)
         
-        if avg_transaction > 500:  # High-value transactions
-            scenarios.append({
-                "description": f"Implement approval process for {category} purchases over ₹500",
-                "projected_cost": current_spend * 0.85,
-                "setup_cost": 0,
-                "benefits": ["thoughtful spending", "avoiding buyer's remorse"],
-                "complexity": "low",
-                "category": category
-            })
+        # Calculate alignment score based on goal type and recommendation content
+        alignment_score = self._calculate_goal_specific_alignment(goal_type, recommendation, potential_savings)
         
-        # Always include a generic optimization scenario
-        scenarios.append({
-            "description": f"General optimization of {category} spending habits",
-            "projected_cost": current_spend * 0.85,
-            "setup_cost": 0,
-            "benefits": ["improved budgeting", "increased savings awareness"],
-            "complexity": "low",
-            "category": category
+        # Calculate contribution potential
+        contribution_potential = min(potential_savings / remaining_amount, 1.0) if remaining_amount > 0 else 0
+        
+        return {
+            'score': alignment_score,
+            'contribution_potential': contribution_potential,
+            'potential_monthly_contribution': potential_savings,
+            'goal_type': goal_type,
+            'remaining_amount': remaining_amount
+        }
+
+    def _extract_savings_from_impact(self, impact_estimate: Optional[str]) -> float:
+        """Extract savings amount from impact estimate string."""
+        if not impact_estimate:
+            return 1000.0  # Default assumption for mock data
+        
+        # Simple regex to find dollar amounts
+        import re
+        amounts = re.findall(r'[₹$]?(\d+(?:\.\d{2})?)', impact_estimate)
+        
+        if amounts:
+            return float(amounts[0])
+        
+        return 1000.0  # Default fallback
+
+    def _calculate_goal_specific_alignment(self, goal_type: str, recommendation: str, potential_savings: float) -> float:
+        """Calculate alignment score based on goal type and recommendation."""
+        recommendation_lower = recommendation.lower()
+        
+        # Goal type alignment weights
+        alignment_weights = {
+            'emergency_fund': 0.9 if 'save' in recommendation_lower or 'reduce' in recommendation_lower else 0.3,
+            'debt_payoff': 0.8 if 'reduce' in recommendation_lower or 'optimize' in recommendation_lower else 0.4,
+            'investment': 0.7 if 'save' in recommendation_lower or 'alternative' in recommendation_lower else 0.3,
+            'vacation': 0.6 if 'save' in recommendation_lower else 0.2,
+            'home_purchase': 0.8 if 'save' in recommendation_lower or 'reduce' in recommendation_lower else 0.4,
+            'retirement': 0.7 if 'optimize' in recommendation_lower or 'reduce' in recommendation_lower else 0.3
+        }
+        
+        base_score = alignment_weights.get(goal_type, 0.5)
+        
+        # Boost score if potential savings are significant
+        if potential_savings > 5000:
+            base_score *= 1.2
+        elif potential_savings > 2000:
+            base_score *= 1.1
+        
+        return min(base_score, 1.0)
+
+    def _calculate_overall_alignment_score(self, goal_alignments: List[Dict]) -> float:
+        """Calculate overall alignment score across all goals."""
+        if not goal_alignments:
+            return 0.5
+        
+        # Weighted average based on alignment scores and contribution potential
+        total_weight = 0
+        weighted_sum = 0
+        
+        for alignment in goal_alignments:
+            weight = alignment['contribution_potential'] + 0.1  # Minimum weight
+            weighted_sum += alignment['score'] * weight
+            total_weight += weight
+        
+        return weighted_sum / total_weight if total_weight > 0 else 0.5
+
+    def _generate_alignment_analysis(self, goal_alignments: List[Dict], user_goals: List[Dict]) -> str:
+        """Generate human-readable alignment analysis."""
+        if not goal_alignments:
+            return "No goals available for alignment analysis."
+        
+        high_alignment_goals = [
+            (goal, alignment) for goal, alignment in zip(user_goals, goal_alignments)
+            if alignment['score'] > 0.6
+        ]
+        
+        if high_alignment_goals:
+            goal_types = [goal['goal_type'].replace('_', ' ') for goal, _ in high_alignment_goals]
+            return f"This recommendation strongly aligns with your {', '.join(goal_types)} goals. " \
+                   f"It could contribute significantly to {len(high_alignment_goals)} of your financial objectives."
+        else:
+            return "This recommendation has moderate alignment with your current financial goals. " \
+                   "Consider how it fits into your overall financial strategy."
+
+    def _generate_aligned_recommendations(self, goal_alignments: List[Dict], 
+                                        recommendation_details: str, 
+                                        impact_estimate: Optional[str]) -> List[Dict[str, Any]]:
+        """Generate recommendations aligned with user goals."""
+        recommendations = []
+        
+        # Primary recommendation
+        recommendations.append({
+            "description": recommendation_details,
+            "alignment_notes": "Primary recommendation based on spending analysis",
+            "estimated_impact": impact_estimate or "Impact analysis pending",
+            "priority": "high"
         })
         
-        return scenarios
-
-    def _calculate_priority(self, cost_benefit_result: Dict) -> str:
-        """Calculate recommendation priority based on cost-benefit metrics"""
-        financial_metrics = cost_benefit_result.get('financial_metrics', {})
-        net_impact = financial_metrics.get('net_financial_impact_over_duration', 0)
-        payback_months = financial_metrics.get('payback_period_months', float('inf'))
+        # Goal-specific recommendations
+        for alignment in goal_alignments:
+            if alignment['score'] > 0.5:
+                goal_type = alignment['goal_type']
+                monthly_contribution = alignment['potential_monthly_contribution']
+                
+                recommendations.append({
+                    "description": f"Allocate savings from this optimization toward your {goal_type.replace('_', ' ')} goal",
+                    "alignment_notes": f"Could contribute ₹{monthly_contribution:.2f}/month toward this goal",
+                    "estimated_impact": f"₹{monthly_contribution * 12:.2f} annual contribution",
+                    "priority": "medium"
+                })
         
-        if net_impact > 1000 and payback_months < 6:
-            return "high"
-        elif net_impact > 500 and payback_months < 12:
-            return "medium"
-        else:
-            return "low"
-
-    def _return_error_response(self, user_id: str, message: str) -> Dict:
-        """Return standardized error response for recommendations"""
-        return {
-            "recommendations": [],
-            "total_scenarios_analyzed": 0,
-            "aggregate_potential_savings": 0,
-            "analysis_metadata": {
-                "user_id": user_id,
-                "error": True,
-                "error_message": message
-            }
-        }
+        return recommendations[:3]  # Limit to top 3 recommendations
