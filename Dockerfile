@@ -32,7 +32,7 @@ COPY wallet/ ./wallet/
 # COPY .env .
 
 # --- Expose FastAPI port ---
-EXPOSE 8000
+EXPOSE 8080
 
 # --- Run FastAPI server ---
-CMD ["sh", "-c", "uvicorn server.run:app --host 0.0.0.0 --port ${PORT:-8000}"]
+CMD ["sh", "-c", "uvicorn server.run:app --host 0.0.0.0 --port ${PORT:-8080}"]
