@@ -1,0 +1,28 @@
+# Ignore Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Ignore virtualenvs
+env/
+venv/
+.venv/
+
+# Ignore local tools and config
+.gcloudignore
+.DS_Store
+.env
+.env.*
+
+# Ignore Git
+.git/
+.gitignore
+
+# Ignore node_modules (in case of monorepo)
+node_modules/
+*.log
+
+# Ignore frontend/client folder (only deploying backend)
+client/
+frontend/
