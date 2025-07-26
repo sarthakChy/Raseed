@@ -93,39 +93,49 @@ const History = () => {
 
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const data = await response.json();
+        let flag = true;
+        const transformed = data.receipts
+  .sort((a, b) => new Date(b.processedAt) - new Date(a.processedAt)) // ✅ sort by processedAt DESC
+  .map((r) => {
+    if(flag) {
+      console.log(r);
+      flag = !flag;
+    }
+    const extracted = r.ocrData?.extractedData || {};
 
-        const transformed = data.receipts.map((r) => {
-          const extracted = r.ocrData?.extractedData || {};
+    const titlecase = (str) => {
+      if (typeof str !== 'string') return 'Not Added';
+      return str
+        .toLowerCase()
+        .replace(/_/g, ' ')
+        .split(' ')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+    };
 
-          const titlecase = (str) => {
-            if (typeof str !== 'string') return 'Not Added';
-            return str
-              .toLowerCase()
-              .replace(/_/g, ' ')
-              .split(' ')
-              .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-              .join(' ');
-          };
+    const category = titlecase(extracted.category);
+    const payment = titlecase(extracted.paymentMethod);
 
-          const category = titlecase(extracted.category);
-          const payment = titlecase(extracted.paymentMethod);
+    const formattedDate = new Date(r.processedAt).toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
 
-          const formattedDate = new Date(r.processedAt).toLocaleDateString(undefined, {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-          });
+    return {
+      gcsUri: r.gcsUri,
+      id: r.receiptId,
+      storeName: extracted.merchantName || "Unknown Store",
+      date: formattedDate,
+      amount: `₹${(extracted.totalAmount || 0).toFixed(2)}`,
+      subText: payment || 'Unknown',
+      category,
+      fullData: extracted,
+      walletLink: r.walletPass.wallet_link || null,
+    };
+  });
 
-          return {
-            id: r.receiptId,
-            storeName: extracted.merchantName || "Unknown Store",
-            date: formattedDate,
-            amount: `₹${(extracted.totalAmount || 0).toFixed(2)}`,
-            subText: payment || 'Unknown',
-            category,
-            fullData: extracted,
-          };
-        });
+
 
         setReceipts(transformed);
       } catch (error) {

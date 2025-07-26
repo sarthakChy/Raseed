@@ -1,5 +1,7 @@
 import React from "react";
 
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
+
 const ReceiptDetailsDialog = ({ isOpen, onClose, receipt }) => {
   if (!isOpen || !receipt) return null;
 
@@ -13,6 +15,24 @@ const ReceiptDetailsDialog = ({ isOpen, onClose, receipt }) => {
       .split(" ")
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
       .join(" ");
+  };
+
+  const handleViewImage = async () => {
+    try {
+      const res = await fetch(
+        `${BACKEND_URL}/api/get-signed-url?gcs_path=${encodeURIComponent(receipt.gcsUri)}`
+      );
+
+      const data = await res.json();
+      if (data.signed_url) {
+        window.open(data.signed_url, "_blank");
+      } else {
+        alert("Unable to fetch image URL.");
+      }
+    } catch (err) {
+      console.error("Error fetching signed URL:", err);
+      alert("Something went wrong while fetching the image.");
+    }
   };
 
   return (
@@ -53,9 +73,26 @@ const ReceiptDetailsDialog = ({ isOpen, onClose, receipt }) => {
               <li>No item data available</li>
             )}
           </ul>
+
         </div>
 
-        <div className="mt-6 text-right">
+        <div className="mt-6 text-right space-x-1 md:space-x-3">
+          {receipt.walletLink && (
+            <button
+              onClick={() => {
+                window.open(receipt.walletLink, "_blank");
+              }}
+              className="px-4 py-2 bg-gray-700 text-white bg-green-500 rounded hover:bg-green-800"
+            >
+              Wallet Pass
+            </button>
+          )}
+          <button
+            onClick={handleViewImage}
+            className="px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-800"
+          >
+            Receipt
+          </button>
           <button
             onClick={onClose}
             className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
