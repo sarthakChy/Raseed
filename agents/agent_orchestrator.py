@@ -11,7 +11,6 @@ from pydantic import BaseModel, Field
 from google.cloud import aiplatform
 from vertexai.generative_models import GenerativeModel, Tool, FunctionDeclaration
 import vertexai
-from core.base_agent_tools.database_connector import DatabaseConnector
 from core.base_agent_tools.config_manager import AgentConfig
 from core.base_agent_tools.vertex_initializer import VertexAIInitializer
 from core.base_agent_tools.integration_coordinator import IntegrationCoordinator

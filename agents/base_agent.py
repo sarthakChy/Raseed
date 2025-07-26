@@ -13,7 +13,6 @@ from core.base_agent_tools.vertex_initializer import VertexAIInitializer
 from core.base_agent_tools.user_profile_manager import UserProfileManager
 from core.base_agent_tools.error_handler import ErrorHandler
 from core.base_agent_tools.integration_coordinator import IntegrationCoordinator
-from core.base_agent_tools.database_connector import DatabaseConnector
 
 
 class BaseAgent(ABC):
@@ -45,7 +44,6 @@ class BaseAgent(ABC):
         self.user_profile_manager = UserProfileManager()
         self.error_handler = ErrorHandler(self.logger)
         self.integration_coordinator = IntegrationCoordinator()
-        self.db_connector = DatabaseConnector(self.project_id)
         
         # Registry for all tools
         self.tools_registry: Dict[str, Any] = {}
