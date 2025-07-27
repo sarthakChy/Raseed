@@ -93,3 +93,4 @@ smart_open==7.3.0.post1
 colorama==0.4.6
 click==8.2.1
 wrapt==1.17.2
+PyYAML==6.0.2
