@@ -59,19 +59,6 @@ logger = logging.getLogger(__name__)
 # ========================== Environment Setup ==========================
 load_dotenv()
 
-# if not firebase_admin._apps:
-#     FIREBASE_CRED_PATH = os.environ.get("FIREBASE_CREDENTIALS", "firebase-sdk.json")
-#     try:
-#         cred = credentials.Certificate(FIREBASE_CRED_PATH)
-#         firebase_admin.initialize_app(cred)
-#     except Exception as e:
-#         raise RuntimeError(f"Could not initialize Firebase Admin SDK: {str(e)}")
-
-# import os
-# import json
-# import firebase_admin
-# from firebase_admin import credentials
-
 firebase_credentials_env = os.environ.get("FIREBASE_CREDENTIALS")
 
 try:
@@ -128,6 +115,7 @@ app.add_middleware(
         "http://localhost:3000",
         "http://localhost:8000",
         "http://localhost:5173",
+        "https://raseed-pearl.vercel.app"
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -211,7 +199,7 @@ async def analyze_receipt(
 # ========================== Receipt Pass ===============================
 
 wallet_manager = ReceiptWalletManager()
-
+from google.cloud import firestore
 @app.post("/receipts/create-wallet-pass")
 async def create_wallet_pass(
     request: Request,
@@ -242,7 +230,13 @@ async def create_wallet_pass(
         result = await wallet_manager.create_receipt_pass(receipt_data, uuid)
 
         # Update the Firestore document with the new pass info
-        doc.reference.update({'walletPass': result})
+        doc.reference.update({
+        'walletPass': {
+            'wallet_link': result.get("wallet_link"),
+            'object_id': result.get("object_id"),
+            'createdAt': firestore.SERVER_TIMESTAMP,
+            }
+        })
 
         if result['success']:
             return result
@@ -415,6 +409,8 @@ async def update_wallet_pass(
 
 # ============================= Chat ===============================================
 
+from utils.user_lookup import get_user_id_by_firebase_uid
+
 @app.post("/chat")
 async def chat_handler(
     request: Request,
@@ -422,15 +418,28 @@ async def chat_handler(
     body: dict = Body(...)
 ):
     try:
+        # ✅ Get firebase UID from auth header
+        firebase_uid = auth.get("uid")
+        if not firebase_uid:
+            raise HTTPException(status_code=401, detail="Invalid authentication")
+
+        # ✅ Get project_id
+        project_id = os.getenv("GCP_PROJECT_ID")
+
+        # ✅ Fetch user_id from DB
+        user_id = await get_user_id_by_firebase_uid(firebase_uid, project_id)
+        
+        if not user_id:
+            raise HTTPException(status_code=404, detail="User not found")
+        
         orchestrator = MasterOrchestrator(
-            project_id=os.getenv("PROJECT_ID"),
+            project_id=project_id,
             config_path="config/agent_config.yaml",
             location="us-central1",
             model_name="gemini-2.0-flash-001"
         )
 
         user_query = body['query']
-        user_id = '4211f8cc-00f4-4c09-ad84-7192e3ea75e2'
 
         result = await orchestrator.process_query(
             query=user_query,
@@ -444,7 +453,7 @@ async def chat_handler(
 
         full_json = json.loads(result.model_dump_json())
         step_results = full_json.get("step_results", {})
-        print(full_json)
+
         # Check each possible key in priority order
         possible_keys = [
             "synthesize_insights",
@@ -468,17 +477,21 @@ async def chat_handler(
     except Exception as e:
         print(f"Error in /chat: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-       
+
 # ============================= Receipt History ===============================================
 
-# from datetime import datetime
+from datetime import datetime
 
-def serialize_firestore_datetime(data: dict) -> dict:
-    for key, value in data.items():
-        if isinstance(value, datetime):
-            data[key] = value.isoformat()
-    return data
-
+def serialize_firestore_datetime(obj):
+    if isinstance(obj, dict):
+        return {k: serialize_firestore_datetime(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [serialize_firestore_datetime(item) for item in obj]
+    elif isinstance(obj, datetime):
+        return obj.isoformat()
+    else:
+        return obj
+    
 @app.get("/receipts/user/{user_id}")
 async def get_user_receipts(
     user_id: str,
@@ -492,9 +505,6 @@ async def get_user_receipts(
         receipts = []
         for doc in docs:
             receipt_data = doc.to_dict()
-            receipt_data["receiptId"] = doc.id
-
-            # Convert Firestore datetime fields to ISO string
             serialized = serialize_firestore_datetime(receipt_data)
             receipts.append(serialized)
 
@@ -541,6 +551,32 @@ async def delete_receipt(
         logging.error(f"Error deleting receipt {receipt_id}: {e}")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Failed to delete receipt")
+
+# ============================= Receipt Image URL Creator ===============================================
+
+def generate_signed_url(gcs_path: str, duration_minutes=15) -> str:
+    # Parse GCS path
+    if not gcs_path.startswith("gs://"):
+        raise ValueError("Invalid GCS path")
+    
+    parts = gcs_path[5:].split("/", 1)
+    bucket_name, blob_path = parts[0], parts[1]
+
+    client = storage.Client()
+    bucket = client.bucket(bucket_name)
+    blob = bucket.blob(blob_path)
+
+    url = blob.generate_signed_url(
+        expiration=timedelta(minutes=duration_minutes),
+        method="GET",
+        version="v4"
+    )
+    return url
+
+@app.get("/get-signed-url")
+async def get_signed_url(gcs_path: str):
+    url = generate_signed_url(gcs_path)
+    return {"signed_url": url}
 
 
 @app.post("/orchestrator/query")

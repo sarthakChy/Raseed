@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { BsChevronDown } from "react-icons/bs";
+import Header from "../components/Header"; // ✅ Added
 
 const faqData = [
   {
@@ -36,9 +37,7 @@ const FAQItem = ({ question, answer, color, isOpen, onToggle }) => (
       aria-expanded={isOpen}
     >
       <div className="flex items-start space-x-4">
-        <div
-          className={`w-4 h-4 rounded-full mt-1 flex-shrink-0 ${color}`}
-        ></div>
+        <div className={`w-4 h-4 rounded-full mt-1 flex-shrink-0 ${color}`}></div>
         <h3 className="font-bold text-gray-800 text-lg">{question}</h3>
       </div>
       <BsChevronDown
@@ -65,23 +64,26 @@ const FAQs = () => {
   };
 
   return (
-    <section className="pt-8">
-      <div className="max-w-3xl mx-auto text-center">
-        <h2 className="text-3xl md:text-4xl font-extrabold text-gray-900 mb-12">
-          Frequently Asked Questions
-        </h2>
-        <div className="space-y-4 text-left">
-          {faqData.map((faq, index) => (
-            <FAQItem
-              key={index}
-              {...faq}
-              isOpen={openIndex === index}
-              onToggle={() => handleToggle(index)}
-            />
-          ))}
+    <>
+      <Header /> {/* ✅ Injected Header */}
+      <section className="pt-8">
+        <div className="max-w-3xl mx-auto text-center">
+          <h2 className="text-3xl md:text-4xl font-extrabold text-gray-900 mb-12">
+            Frequently Asked Questions
+          </h2>
+          <div className="space-y-4 text-left">
+            {faqData.map((faq, index) => (
+              <FAQItem
+                key={index}
+                {...faq}
+                isOpen={openIndex === index}
+                onToggle={() => handleToggle(index)}
+              />
+            ))}
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
+    </>
   );
 };
 

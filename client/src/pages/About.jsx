@@ -18,6 +18,7 @@ import {
   SiFirebase,
   SiPostman,
 } from "react-icons/si";
+import Header from "../components/Header"; // ✅ Added
 
 // ⭐ StarRating Component
 const StarRating = ({ rating }) => (
@@ -39,7 +40,10 @@ const TechTag = ({ children, className = "" }) => (
 
 const About = () => {
   return (
-    <div className="bg-white font-sans">
+    <>
+      <Header /> {/* ✅ Added drawer/mobile header */}
+
+      <div className="bg-white font-sans">
       {/* What's RASEED */}
       <section className="py-16 px-4">
         <div className="container mx-auto flex flex-col md:flex-row items-center justify-center">
@@ -247,6 +251,9 @@ const About = () => {
         </div>
       </section>
     </div>
+
+    </>
+    
   );
 };
 

@@ -47,7 +47,7 @@ export default function SignUpCard() {
           />
         </button>
         <h2 className="mt-2 text-xl font-bold tracking-tight text-gray-900">
-          Create your Florette account
+          Create your Raseed account
         </h2>
       </div>
 

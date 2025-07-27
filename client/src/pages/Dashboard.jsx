@@ -11,7 +11,8 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { FaAngleDown, FaArrowUp, FaArrowDown } from "react-icons/fa";
+import { FaArrowUp, FaArrowDown } from "react-icons/fa";
+import Header from "../components/Header";
 
 // --- Reusable Card Component ---
 const Card = ({ children, className }) => (
@@ -24,7 +25,7 @@ const Card = ({ children, className }) => (
   </div>
 );
 
-// --- Data for Charts ---
+// --- Chart Data ---
 const spendingByCategoryData = [
   { name: "Food", value: 400 },
   { name: "Shopping", value: 300 },
@@ -52,8 +53,7 @@ const spendingOverTimeData = [
   { name: "May", spending: 4800 },
 ];
 
-// --- Color Palettes (FIXED) ---
-// By separating palettes, we ensure that we only access string values for single-color styles, resolving the TypeScript error.
+// --- Colors ---
 const CATEGORY_COLORS = {
   Food: "#0088FE",
   Shopping: "#FFBB28",
@@ -69,22 +69,14 @@ const PAYMENT_METHOD_COLORS = {
 
 const MERCHANT_COLORS = ["#0088FE", "#82B1FF", "#CFD8DC"];
 
-
-// --- Main Dashboard Component ---
+// --- Dashboard Component ---
 const Dashboard = () => {
   return (
-    <div className="bg-gray-50 min-h-screen p-4 sm:p-8">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <header className="flex justify-between items-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-800">Dashboard</h1>
-          {/* `<button className="bg-white border border-gray-300 text-gray-700 font-medium py-2 px-4 rounded-lg flex items-center space-x-2">
-            <span>Apr 1, 2024 - Apr 20, 2024</span>
-            <FaAngleDown />
-          </button>` */}
-        </header>
-
-        {/* Top Stats Cards */}
+    <>
+      <Header />
+      <div className="bg-gray-50 min-h-screen flex flex-col">
+      <div className="max-w-7xl w-full mx-auto p-4 sm:p-8 flex-grow">
+        {/* Top Stats */}
         <section className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
           <Card>
             <p className="text-gray-500 mb-1">Receipts Scanned</p>
@@ -110,29 +102,22 @@ const Dashboard = () => {
           </Card>
         </section>
 
-        {/* Main Content Grid */}
+        {/* Main Grid */}
         <main className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
           {/* Left Column */}
           <div className="lg:col-span-1 space-y-6">
             <Card>
-              <h2 className="font-bold text-lg mb-3">
-                Spending Pattern Analysis
-              </h2>
+              <h2 className="font-bold text-lg mb-3">Spending Pattern Analysis</h2>
               <ul className="space-y-3 text-gray-700">
                 <li className="flex items-center">
-                  <FaArrowDown className="text-red-500 mr-2" /> 4.2% increase
-                  over weekends
+                  <FaArrowDown className="text-red-500 mr-2" /> 4.2% increase over weekends
                 </li>
-                <li>
-                  • You spend more on shopping after your salary credit date
-                </li>
+                <li>• You spend more on shopping after your salary credit date</li>
               </ul>
             </Card>
             <Card>
-              <h2 className="font-bold text-lg mb-3">
-                Smart Insights & Recommendations
-              </h2>
+              <h2 className="font-bold text-lg mb-3">Smart Insights & Recommendations</h2>
               <ul className="space-y-2 text-gray-700 list-disc list-inside">
                 <li>You spent 25% more on food this month</li>
                 <li>Amazon was your most used merchant (8 receipts)</li>
@@ -164,10 +149,7 @@ const Dashboard = () => {
                         innerRadius={30}
                       >
                         {spendingByCategoryData.map((entry) => (
-                          <Cell
-                            key={`cell-${entry.name}`}
-                            fill={CATEGORY_COLORS[entry.name]}
-                          />
+                          <Cell key={entry.name} fill={CATEGORY_COLORS[entry.name]} />
                         ))}
                       </Pie>
                     </PieChart>
@@ -186,6 +168,7 @@ const Dashboard = () => {
                 </ul>
               </div>
             </Card>
+
             <Card>
               <h2 className="font-bold text-lg mb-4">Spending Over Time</h2>
               <div className="h-48">
@@ -201,9 +184,7 @@ const Dashboard = () => {
                       axisLine={false}
                       tickFormatter={(value) => `₹${value / 1000}k`}
                     />
-                    <Tooltip
-                      formatter={(value) => `₹${value.toLocaleString()}`}
-                    />
+                    <Tooltip formatter={(value) => `₹${value.toLocaleString()}`} />
                     <Line
                       type="monotone"
                       dataKey="spending"
@@ -216,10 +197,9 @@ const Dashboard = () => {
                 </ResponsiveContainer>
               </div>
             </Card>
+
             <Card>
-              <h2 className="font-bold text-lg mb-4">
-                Payment Method Breakdown
-              </h2>
+              <h2 className="font-bold text-lg mb-4">Payment Method Breakdown</h2>
               <div className="flex items-center">
                 <div className="w-1/2 h-40">
                   <ResponsiveContainer>
@@ -233,10 +213,7 @@ const Dashboard = () => {
                         outerRadius={60}
                       >
                         {paymentMethodData.map((entry) => (
-                          <Cell
-                            key={`cell-${entry.name}`}
-                            fill={PAYMENT_METHOD_COLORS[entry.name]}
-                          />
+                          <Cell key={entry.name} fill={PAYMENT_METHOD_COLORS[entry.name]} />
                         ))}
                       </Pie>
                     </PieChart>
@@ -247,9 +224,7 @@ const Dashboard = () => {
                     <li key={item.name} className="flex items-center">
                       <span
                         className="w-3 h-3 rounded-full mr-2"
-                        style={{
-                          backgroundColor: PAYMENT_METHOD_COLORS[item.name],
-                        }}
+                        style={{ backgroundColor: PAYMENT_METHOD_COLORS[item.name] }}
                       ></span>
                       {item.name}: {item.value}%
                     </li>
@@ -257,10 +232,9 @@ const Dashboard = () => {
                 </ul>
               </div>
             </Card>
+
             <Card>
-              <h2 className="font-bold text-lg mb-4">
-                Most Frequent Merchants
-              </h2>
+              <h2 className="font-bold text-lg mb-4">Most Frequent Merchants</h2>
               <div className="flex items-center justify-between">
                 <ul className="space-y-2 text-gray-700">
                   {mostFrequentMerchantsData.map((item) => (
@@ -280,10 +254,8 @@ const Dashboard = () => {
                       >
                         {mostFrequentMerchantsData.map((entry, index) => (
                           <Cell
-                            key={`cell-${entry.name}`}
-                            fill={
-                              MERCHANT_COLORS[index % MERCHANT_COLORS.length]
-                            }
+                            key={entry.name}
+                            fill={MERCHANT_COLORS[index % MERCHANT_COLORS.length]}
                           />
                         ))}
                       </Pie>
@@ -291,14 +263,16 @@ const Dashboard = () => {
                   </ResponsiveContainer>
                 </div>
               </div>
-               <button className="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-lg mt-4 hover:bg-blue-700 transition-colors">Export Data</button>
+              <button className="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-lg mt-4 hover:bg-blue-700 transition-colors">
+                Export Data
+              </button>
             </Card>
           </div>
-
         </main>
-
       </div>
     </div>
+    </>
+    
   );
 };
 

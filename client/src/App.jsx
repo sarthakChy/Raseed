@@ -11,8 +11,7 @@ import ScanReceipts from './pages/ScanReceipts';
 import ReceiptResult from './pages/ReceiptResult';
 import Chatbot from './pages/Chatbot';
 
-import Header from './components/Header'; // Assuming these exist
-import Hero from './components/Hero';
+import Hero from './pages/Hero';
 import About from './pages/About';
 import Upgrade from './pages/Upgrade';
 import FAQs from './pages/FAQs';
@@ -24,10 +23,9 @@ import GetStarted from './pages/GetStarted';
 export default function App() {
   return (
     <Router>
-      <div className="bg-[#FEFBF6] min-h-screen text-gray-900 overflow-x-hidden hide-scrollbar">
-        <div className="container h-screen mx-auto px-6 lg:px-8">
-          <Header />
-          <main className="h-4/5">
+      <div className="bg-[#FEFBF6] min-h-screen text-gray-900 overflow-x-hidden">
+        <div className="max-w-screen-xl mx-auto px-4 sm:px-6 lg:px-8 ">
+          <main className="py-4 ">
             <Routes>
               {/* Public Routes */}
               <Route path="/" element={<Hero />} />
@@ -64,7 +62,6 @@ export default function App() {
                   <ReceiptResult />
                 </PrivateRoute>
               } />
-
               <Route path="/getstarted" element={
                 <PrivateRoute>
                   <GetStarted />
