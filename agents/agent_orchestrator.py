@@ -16,6 +16,7 @@ from core.base_agent_tools.vertex_initializer import VertexAIInitializer
 from core.base_agent_tools.integration_coordinator import IntegrationCoordinator
 from core.base_agent_tools.error_handler import ErrorHandler
 from core.base_agent_tools.user_profile_manager import UserProfileManager
+from agents.translate import TranslationService 
 
 
 class IntentType(Enum):
@@ -93,6 +94,7 @@ class WorkflowResult:
     execution_time: float = 0.0
     error_summary: str = ""
 
+
 class StepResultResponse(BaseModel):
     step_id: str
     agent_name: str
@@ -101,6 +103,7 @@ class StepResultResponse(BaseModel):
     error: str = ""
     execution_time: float = 0.0
     retry_attempt: int = 0
+
 
 class OrchestratorResponse(BaseModel):
     success: bool
@@ -113,13 +116,16 @@ class OrchestratorResponse(BaseModel):
     error_summary: str = ""
     error: Optional[str] = None
     query: Optional[str] = None
+    # Add translation metadata
+    original_language: Optional[str] = None
+    translation_confidence: Optional[float] = None
+    was_translated: bool = False
 
     class Config:
         arbitrary_types_allowed = True
         json_encoders = {
             uuid.UUID: lambda u: str(u)
         }
-
 
 
 class MasterOrchestrator:
@@ -143,12 +149,20 @@ class MasterOrchestrator:
         self.integration_coordinator = IntegrationCoordinator()
         self.error_handler = ErrorHandler(self.logger)
         self.user_profile_manager = UserProfileManager()
+        
+        # Initialize translation service
+        try:
+            self.translation_service = TranslationService(project_id=self.project_id)
+            self.logger.info("Translation service initialized successfully")
+        except Exception as e:
+            self.logger.error(f"Failed to initialize translation service: {e}")
+            self.translation_service = None
 
         VertexAIInitializer.initialize(self.project_id, self.location)
         
         # Load configurations - Initialize these before loading
         self.agent_configs: Dict[str, AgentConfig] = {}
-        self.agent_definitions: Dict[str, AgentDefinition] = {}  # Added this line
+        self.agent_definitions: Dict[str, AgentDefinition] = {}
         self.workflow_definitions: Dict[IntentType, WorkflowDefinition] = {}
         self._load_configurations(config_path)
         
@@ -203,24 +217,100 @@ class MasterOrchestrator:
         except Exception as e:
             self.logger.error(f"Failed to load configurations: {e}")
             raise
+
+    async def translate_query_to_english(self, query: str) -> Dict[str, Any]:
+        """
+        Translate user query to English if needed.
+        
+        Args:
+            query: User's query in any language
+            
+        Returns:
+            Dictionary with translation result and metadata
+        """
+        if not self.translation_service:
+            return {
+                'success': False,
+                'translated_text': query,
+                'original_text': query,
+                'source_language': 'unknown',
+                'was_translated': False,
+                'error': 'Translation service not available'
+            }
+        
+        try:
+            # First detect if it's already English
+            if self.translation_service.is_english(query):
+                return {
+                    'success': True,
+                    'translated_text': query,
+                    'original_text': query,
+                    'source_language': 'en',
+                    'was_translated': False,
+                    'detection_confidence': 1.0
+                }
+            
+            # Translate to English
+            result = self.translation_service.translate_to_english(query)
+            return result
+            
+        except Exception as e:
+            self.logger.error(f"Query translation failed: {e}")
+            return {
+                'success': False,
+                'translated_text': query,
+                'original_text': query,
+                'source_language': 'unknown',
+                'was_translated': False,
+                'error': str(e)
+            }
+
+    async def translate_response_to_user_language(self, response: str, target_language: str) -> Dict[str, Any]:
+        """
+        Translate response back to user's language.
+        
+        Args:
+            response: English response text
+            target_language: Target language code
+            
+        Returns:
+            Dictionary with translation result
+        """
+        if not self.translation_service or target_language == 'en':
+            return {
+                'success': True,
+                'translated_text': response,
+                'original_text': response,
+                'target_language': target_language or 'en',
+                'was_translated': False
+            }
+        
+        try:
+            result = self.translation_service.translate_from_english(response, target_language)
+            return result
+            
+        except Exception as e:
+            self.logger.error(f"Response translation failed: {e}")
+            return {
+                'success': False,
+                'translated_text': response,
+                'original_text': response,
+                'target_language': target_language,
+                'was_translated': False,
+                'error': str(e)
+            }
     
     async def classify_intent(self, query: str) -> IntentType:
         """
         Classify user query intent using Vertex AI.
         
         Args:
-            query: User's natural language query
-            user_context: Additional context about the user
+            query: User's natural language query (should be in English)
             
         Returns:
             Classified intent type
         """
         try:
-            # Prepare classification prompt
-            # context_str = ""
-            # if user_context:
-            #     context_str = f"\nUser Context: {json.dumps(user_context, indent=2)}"
-            
             prompt = f"""
 Classify the following financial query into one of these intent types:
 
@@ -307,7 +397,7 @@ If the query doesn't clearly fit any category, respond with UNKNOWN.
             agent = await self.load_agent(step.agent_name)
             
             # Prepare input for the step
-            step_input = {"query": workflow_context.get("original_query", "")}
+            step_input = {"query": workflow_context.get("translated_query", workflow_context.get("original_query", ""))}
             
             # Map outputs from previous steps
             for input_key, source_path in step.input_mapping.items():
@@ -511,7 +601,6 @@ If the query doesn't clearly fit any category, respond with UNKNOWN.
             workflow_state["status"] = status.value
             self.integration_coordinator.update_shared_state({f"workflow_{workflow_id}": workflow_state})
             
-            # Return the WorkflowResult - THIS WAS MISSING!
             return WorkflowResult(
                 workflow_id=workflow_id,
                 intent_type=workflow.intent_type,
@@ -543,69 +632,172 @@ If the query doesn't clearly fit any category, respond with UNKNOWN.
         self,
         query: str,
         user_id: Optional[str] = None,
-        additional_context: Optional[Dict] = None
+        additional_context: Optional[Dict] = None,
+        preserve_user_language: bool = True
     ) -> OrchestratorResponse:
         """
-        Process a user query through the complete orchestration pipeline.
+        Process a user query through the complete orchestration pipeline with multilingual support.
         
         Args:
-            query: User's natural language query
+            query: User's natural language query in any language
             user_id: User identifier
             additional_context: Additional context for processing
+            preserve_user_language: Whether to translate response back to user's language
             
         Returns:
             Complete response with results and metadata
         """
+        start_time = datetime.now()
+        original_query = query
+        translation_metadata = {}
+        
         try:
-            # Classify intent
-            intent = await self.classify_intent(query)
-            self.logger.info(f"Classified intent: {intent.value} for query: {query[:50]}...")
+            # Step 1: Translate query to English if needed
+            translation_result = await self.translate_query_to_english(query)
             
-            # Check if we have a workflow for this intent
+            if not translation_result['success']:
+                self.logger.warning(f"Query translation failed: {translation_result.get('error', 'Unknown error')}")
+                # Continue with original query if translation fails
+                english_query = query
+                translation_metadata = {
+                    'original_language': 'unknown',
+                    'translation_confidence': 0.0,
+                    'was_translated': False
+                }
+            else:
+                english_query = translation_result['translated_text']
+                translation_metadata = {
+                    'original_language': translation_result.get('source_language', 'unknown'),
+                    'translation_confidence': translation_result.get('detection_confidence', translation_result.get('confidence', 0.0)),
+                    'was_translated': translation_result.get('was_translated', False)
+                }
+            
+            self.logger.info(f"Query translation: {translation_metadata}")
+            
+            # Step 2: Classify intent (using English query)
+            intent = await self.classify_intent(english_query)
+            self.logger.info(f"Classified intent: {intent.value} for query: {english_query[:50]}...")
+            
+            # Step 3: Check if we have a workflow for this intent
             if intent not in self.workflow_definitions:
+                response_text = f"No workflow defined for intent: {intent.value}"
+                
+                # Translate error message back to user's language if needed
+                if (preserve_user_language and 
+                    translation_metadata.get('was_translated') and 
+                    translation_metadata.get('original_language') != 'en'):
+                    
+                    error_translation = await self.translate_response_to_user_language(
+                        response_text, 
+                        translation_metadata['original_language']
+                    )
+                    if error_translation['success']:
+                        response_text = error_translation['translated_text']
+                
                 return OrchestratorResponse(
                     success=False,
-                    error=f"No workflow defined for intent: {intent.value}",
-                    intent=intent.value
+                    error=response_text,
+                    intent=intent.value,
+                    **translation_metadata
                 )
             
-            # Prepare workflow context
+            # Step 4: Prepare workflow context
             workflow_context = {
-                "original_query": query,
+                "original_query": original_query,
+                "translated_query": english_query,
                 "user_id": user_id,
                 "intent": intent.value,
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
+                "translation_metadata": translation_metadata
             }
             
-            # Execute workflow
+            if additional_context:
+                workflow_context.update(additional_context)
+            
+            # Step 5: Execute workflow
             workflow = self.workflow_definitions[intent]
             result = await self.execute_workflow(workflow, workflow_context)
             
-            # Return comprehensive response
+            # Step 6: Translate response back to user's language if needed
+            final_response = result.final_response
+            if (preserve_user_language and 
+                translation_metadata.get('was_translated') and 
+                translation_metadata.get('original_language') != 'en' and
+                final_response):
+                
+                response_translation = await self.translate_response_to_user_language(
+                    final_response, 
+                    translation_metadata['original_language']
+                )
+                
+                if response_translation['success']:
+                    final_response = response_translation['translated_text']
+                    self.logger.info(f"Response translated back to {translation_metadata['original_language']}")
+                else:
+                    self.logger.warning(f"Failed to translate response back to user language: {response_translation.get('error')}")
+            
+            # Step 7: Return comprehensive response
+            execution_time = (datetime.now() - start_time).total_seconds()
+            
             return OrchestratorResponse(
                 success=result.status in [WorkflowStatus.COMPLETED, WorkflowStatus.PARTIAL_SUCCESS],
                 workflow_id=result.workflow_id,
                 intent=intent.value,
                 status=result.status.value,
-                response=result.final_response,
-                execution_time=result.execution_time,
+                response=final_response,
+                execution_time=execution_time,
                 step_results={k: asdict(v) for k, v in result.results.items()},
-                error_summary=result.error_summary
+                error_summary=result.error_summary,
+                **translation_metadata
             )
             
         except Exception as e:
+            execution_time = (datetime.now() - start_time).total_seconds()
+            error_message = str(e)
+            
+            # Try to translate error message to user's language
+            if (preserve_user_language and 
+                translation_metadata.get('was_translated') and 
+                translation_metadata.get('original_language') != 'en'):
+                
+                error_translation = await self.translate_response_to_user_language(
+                    error_message, 
+                    translation_metadata['original_language']
+                )
+                if error_translation['success']:
+                    error_message = error_translation['translated_text']
+            
             self.logger.error(f"Query processing failed: {e}")
             return OrchestratorResponse(
                 success=False,
-                error=str(e),
-                query=query
+                error=error_message,
+                query=original_query,
+                execution_time=execution_time,
+                **translation_metadata
             )
+    
+    def get_supported_languages(self) -> List[Dict[str, str]]:
+        """Get list of supported languages for translation."""
+        if not self.translation_service:
+            return []
+        
+        return self.translation_service.get_supported_languages()
     
     def get_system_status(self) -> Dict[str, Any]:
         """Get current system status and metrics."""
-        return {
+        status = {
             "loaded_agents": list(self.agents_registry.keys()),
             "available_agents": list(self.agent_definitions.keys()),
             "workflow_definitions": len(self.workflow_definitions),
-            "system_stats": self.integration_coordinator.get_system_stats()
+            "system_stats": self.integration_coordinator.get_system_stats(),
+            "translation_service_available": self.translation_service is not None
         }
+        
+        if self.translation_service:
+            try:
+                supported_languages_count = len(self.get_supported_languages())
+                status["supported_languages_count"] = supported_languages_count
+            except Exception as e:
+                status["translation_service_error"] = str(e)
+        
+        return status
