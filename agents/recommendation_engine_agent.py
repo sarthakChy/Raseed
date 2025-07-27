@@ -1,933 +1,788 @@
 import logging
 import asyncio
-import json
-import traceback
-from typing import Dict, Any, List, Optional
+import os
+from typing import Dict, List, Any, Optional, Union, Tuple
 from datetime import datetime, timedelta
-import random
-import numpy as np
+import json
+import time
+import uuid
+from vertexai.generative_models import FunctionDeclaration, Tool
+
 from agents.base_agent import BaseAgent
-from vertexai.generative_models import GenerativeModel, FunctionDeclaration, Tool
-from utils.database_connector import DatabaseConnector
+from core.recommendation_agent_tools.alternative_discovery_tool import AlternativeDiscoveryTool
 
 
 class RecommendationEngineAgent(BaseAgent):
     """
-    Main recommendation engine agent that coordinates different recommendation tools.
+    Specialized agent for generating financial recommendations including merchant alternatives,
+    product suggestions, and spending optimization recommendations.
     """
-    def __init__(self, agent_name: str = "recommendation_engine_agent", project_id: str = "massive-incline-466204-t5", location: str = "us-central1", model_name: str = "gemini-2.0-flash-001", user_id: Optional[str] = None):
-        super().__init__(
-            agent_name="RecommendationEngineAgent",
-            project_id=project_id,
-            location=location,
-            model_name=model_name,
-            user_id=user_id
-        )
-
-        self.logger.info(f"Initializing RecommendationEngineAgent with project_id={project_id}")
+    
+    def __init__(
+        self,
+        agent_name: str = "recommendation_engine_agent",
+        project_id: str = "massive-incline-466204-t5",
+        location: str = "us-central1",
+        model_name: str = "gemini-2.0-flash-001",
+        user_id: Optional[str] = None,
+    ):
+        """
+        Initialize the Recommendation Agent.
         
-        # Initialize specialized tools
-        self.behavioral_analysis_tool = BehavioralAnalysisTool(project_id=project_id, logger=self.logger)
-        self.alternative_discovery_tool = AlternativeDiscoveryTool(project_id=project_id, logger=self.logger)
-        self.budget_optimization_tool = BudgetOptimizationTool(project_id=project_id, logger=self.logger)
-        self.cost_benefit_analysis_tool = CostBenefitAnalysisTool(project_id=project_id, logger=self.logger)
-        self.goal_alignment_tool = GoalAlignmentTool(project_id=project_id, logger=self.logger)
-
+        Args:
+            agent_name: Name identifier for this agent
+            project_id: Google Cloud project ID
+            location: Vertex AI location
+            model_name: Model for analysis and responses
+            user_id: Current user identifier
+        """
+        super().__init__(agent_name, project_id, location, model_name, user_id)
+        
+        # Initialize alternative discovery tool
+        self.logger.info(f"Initializing RecommendationEngineAgent with project_id={project_id}, location={location}")
+        self.alternative_discovery_tool = AlternativeDiscoveryTool(
+            project_id=project_id,
+            logger=self.logger
+        )
+        
+        # Register recommendation tools
         self._register_recommendation_tools()
-        self.analysis_cache = {}
-
+        
+        # Recommendation cache for performance optimization
+        self.recommendation_cache = {}
+        
+        self.logger.info("Recommendation Agent initialized with alternative discovery tools")
+    
     def _register_recommendation_tools(self):
-        """Register all recommendation tools with Vertex AI."""
+        """Register recommendation specific tools using Vertex AI FunctionDeclaration."""
+        
+        # Step 1: Define all FunctionDeclaration instances
         function_declarations = [
             FunctionDeclaration(
-                name="analyze_behavioral_spending_patterns",
-                description="Analyzes user's historical spending habits to identify patterns and optimization opportunities.",
+                name="find_merchant_alternatives",
+                description="Find alternative merchants based on user's transaction history and spending patterns",
                 parameters={
                     "type": "object",
                     "properties": {
-                        "user_id": {"type": "string", "description": "User identifier"},
-                        "lookback_months": {"type": "integer", "description": "Months to analyze", "default": 6},
-                        "category_filter": {"type": "string", "description": "Optional category filter", "nullable": True}
-                    },
-                    "required": ["user_id"]
+                        "criteria": {
+                            "type": "string",
+                            "enum": ["cost_savings", "value", "convenience", "quality"],
+                            "description": "Criteria for finding alternatives",
+                            "default": "cost_savings"
+                        },
+                        "limit": {
+                            "type": "integer",
+                            "description": "Number of alternatives per merchant",
+                            "default": 5
+                        },
+                        "focus_merchants": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Specific merchants to find alternatives for (optional)"
+                        }
+                    }
                 }
             ),
             FunctionDeclaration(
-                name="discover_cheaper_alternatives",
-                description="Finds cheaper alternatives using vector similarity search.",
+                name="find_category_alternatives",
+                description="Find alternatives within a specific spending category for optimization",
                 parameters={
                     "type": "object",
                     "properties": {
-                        "user_id": {"type": "string"},
-                        "item_description": {"type": "string"},
-                        "item_category": {"type": "string"},
-                        "price": {"type": "number"},
-                        "location_preference": {"type": "string", "nullable": True}
+                        "target_category": {
+                            "type": "string",
+                            "description": "Category to find alternatives for (e.g., 'food', 'transportation')"
+                        },
+                        "optimization_type": {
+                            "type": "string",
+                            "enum": ["cost_reduction", "quality_improvement", "convenience"],
+                            "description": "Type of optimization to focus on",
+                            "default": "cost_reduction"
+                        }
                     },
-                    "required": ["user_id", "item_description", "item_category", "price"]
+                    "required": ["target_category"]
                 }
             ),
             FunctionDeclaration(
-                name="optimize_budget_allocation",
-                description="Optimizes budget allocation based on financial goals.",
+                name="find_product_alternatives",
+                description="Find alternative products based on transaction items and user preferences",
                 parameters={
                     "type": "object",
                     "properties": {
-                        "user_id": {"type": "string"},
-                        "financial_goal": {"type": "string"},
-                        "target_amount": {"type": "number"},
-                        "current_amount": {"type": "number"},
-                        "focus_category": {"type": "string", "nullable": True}
-                    },
-                    "required": ["user_id", "financial_goal", "target_amount", "current_amount"]
+                        "focus_items": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Specific items to find alternatives for (optional)"
+                        }
+                    }
                 }
             ),
             FunctionDeclaration(
-                name="perform_cost_benefit_analysis",
-                description="Performs comprehensive cost-benefit analysis with embedding-based item matching.",
+                name="generate_spending_recommendations",
+                description="Generate comprehensive spending optimization recommendations",
                 parameters={
                     "type": "object",
                     "properties": {
-                        "user_id": {"type": "string"},
-                        "spending_analysis": {"type": "object"},
-                        "user_goals": {"type": "object", "nullable": True},
-                        "original_query": {"type": "string", "nullable": True}
-                    },
-                    "required": ["user_id", "spending_analysis"]
-                }
-            ),
-            FunctionDeclaration(
-                name="align_recommendation_to_financial_goals",
-                description="Aligns recommendations with user's financial goals.",
-                parameters={
-                    "type": "object",
-                    "properties": {
-                        "user_id": {"type": "string"},
-                        "recommendation_details": {"type": "string"},
-                        "impact_estimate": {"type": "string", "nullable": True},
-                        "relevant_goals": {"type": "array", "items": {"type": "string"}, "nullable": True}
-                    },
-                    "required": ["user_id", "recommendation_details"]
+                        "recommendation_type": {
+                            "type": "string",
+                            "enum": ["savings", "optimization", "diversification", "quality", "convenience"],
+                            "description": "Type of recommendations to generate",
+                            "default": "savings"
+                        },
+                        "priority_level": {
+                            "type": "string",
+                            "enum": ["high", "medium", "low", "all"],
+                            "description": "Priority level of recommendations to return",
+                            "default": "all"
+                        }
+                    }
                 }
             )
         ]
 
-        # Create a single tool with all function declarations
-        tool = Tool(function_declarations=function_declarations)
-        
-        # Configure the model with the tool
-        self.model = GenerativeModel(
-            model_name=self.model_name,
-            tools=[tool],
-            system_instruction="""You are a financial recommendation assistant. Analyze spending patterns and provide personalized recommendations for budget optimization. 
+        # Step 2: Register each FunctionDeclaration with its executor
+        for function_decl in function_declarations:
+            raw_name = function_decl._raw_function_declaration.name
+            executor = self._get_tool_executor(raw_name)
+            self.register_tool(function_decl, executor)
 
-When you receive spending data, analyze it and call the appropriate functions to provide insights. Start with behavioral analysis, then consider alternatives and optimizations."""
-        )
-
-        # Map function names to their executors
-        self.function_executors = {
-            "analyze_behavioral_spending_patterns": self.behavioral_analysis_tool.analyze_patterns,
-            "discover_cheaper_alternatives": self.alternative_discovery_tool.discover_alternatives,
-            "optimize_budget_allocation": self.budget_optimization_tool.optimize_allocation,
-            "perform_cost_benefit_analysis": self.cost_benefit_analysis_tool.analyze_recommendations,
-            "align_recommendation_to_financial_goals": self.goal_alignment_tool.align_with_goals
+        self.logger.info("Registered recommendation tools and initialized model with tool support.")
+    
+    def _get_tool_executor(self, tool_name: str):
+        """Get the appropriate executor function for a tool."""
+        executor_map = {
+            "find_merchant_alternatives": self._execute_merchant_alternatives,
+            "find_category_alternatives": self._execute_category_alternatives,
+            "find_product_alternatives": self._execute_product_alternatives,
+            "generate_spending_recommendations": self._execute_spending_recommendations,
         }
-
-    async def process(self, request: Dict[str, Any]) -> Dict[str, Any]:
-        """Main processing method for recommendation requests."""
+        return executor_map.get(tool_name)
+    
+    def _extract_transaction_data(self, request: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        Extract and normalize transaction data from various possible formats.
+        
+        Args:
+            request: The request containing transaction data in various possible formats
+            
+        Returns:
+            List of normalized transaction dictionaries
+        """
+        transaction_data = []
+        
+        # Check multiple possible locations for transaction data
+        possible_data_keys = [
+            'spending_analysis',
+            'transaction_data', 
+            'transactions',
+            'data',
+            'financial_data'
+        ]
+        
+        raw_data = None
+        for key in possible_data_keys:
+            if key in request:
+                raw_data = request[key]
+                break
+        
+        if raw_data is None:
+            self.logger.warning("No transaction data found in request")
+            return []
+        
+        # Handle different data formats
+        if isinstance(raw_data, list):
+            # Direct list of transactions
+            transaction_data = raw_data
+        elif isinstance(raw_data, dict):
+            # Check if it's a nested structure
+            if 'data' in raw_data:
+                transaction_data = raw_data['data']
+            elif 'transactions' in raw_data:
+                transaction_data = raw_data['transactions']
+            else:
+                # Assume the dict itself contains transaction fields
+                transaction_data = [raw_data]
+        elif isinstance(raw_data, str):
+            # Try to parse as JSON
+            try:
+                parsed_data = json.loads(raw_data)
+                if isinstance(parsed_data, list):
+                    transaction_data = parsed_data
+                elif isinstance(parsed_data, dict):
+                    transaction_data = parsed_data.get('data', [parsed_data])
+            except json.JSONDecodeError:
+                self.logger.error(f"Failed to parse transaction data as JSON: {raw_data}")
+                return []
+        
+        # Validate and normalize transaction data
+        normalized_transactions = []
+        for item in transaction_data:
+            if isinstance(item, dict):
+                normalized_transactions.append(item)
+            else:
+                self.logger.warning(f"Skipping non-dict transaction item: {type(item)}")
+        
+        self.logger.info(f"Extracted {len(normalized_transactions)} valid transactions")
+        return normalized_transactions
+    
+    # Tool executor methods
+    async def _execute_merchant_alternatives(
+        self,
+        user_id: str,
+        transaction_data: List[Dict[str, Any]],
+        criteria: str = "cost_savings",
+        limit: int = 5,
+        focus_merchants: Optional[List[str]] = None
+    ) -> Dict[str, Any]:
+        """
+        Execute merchant alternatives finding.
+        """
         try:
-            user_id = request.get("user_id")
-            prompt_text = request.get("query", "")
-            context_data = request.get("spending_analysis", {})
-
-            if not user_id:
-                return {"status": "error", "message": "Missing 'user_id' in request."}
-
-            self.set_user_context(user_id)
-
-            # Prepare the input content with spending analysis
-            analysis_summary = self._prepare_spending_summary(context_data)
+            self.logger.info(f"Finding merchant alternatives for user {user_id} with criteria: {criteria}")
             
-            input_prompt = f"""
-            Analyze the following spending data and provide recommendations:
-            
-            User Query: {prompt_text}
-            
-            Spending Summary:
-            {analysis_summary}
-            
-            Please analyze this data and call the appropriate functions to provide insights and recommendations.
-            """
-
-            # Generate content with function calling
-            response = await self.model.generate_content_async(input_prompt)
-            
-            # Process function calls if any
-            if response.candidates and response.candidates[0].content.parts:
-                for part in response.candidates[0].content.parts:
-                    if hasattr(part, 'function_call') and part.function_call:
-                        # Execute the function call
-                        function_name = part.function_call.name
-                        function_args = {}
-                        
-                        # Extract arguments from function call
-                        for key, value in part.function_call.args.items():
-                            function_args[key] = value
-                        
-                        # Add user_id if not present
-                        if 'user_id' not in function_args:
-                            function_args['user_id'] = user_id
-                        
-                        # Add spending_analysis if calling cost-benefit analysis
-                        if function_name == "perform_cost_benefit_analysis" and 'spending_analysis' not in function_args:
-                            function_args['spending_analysis'] = context_data
-                        
-                        # Execute the function
-                        if function_name in self.function_executors:
-                            try:
-                                tool_output = await self.function_executors[function_name](**function_args)
-                                
-                                return {
-                                    "status": "success",
-                                    "tool_executed": function_name,
-                                    "tool_raw_output": tool_output,
-                                    "recommendations": tool_output.get("recommendations", []) if isinstance(tool_output, dict) else [],
-                                    "insights": tool_output.get("insights", "") if isinstance(tool_output, dict) else str(tool_output)
-                                }
-                            except Exception as e:
-                                self.logger.error(f"Error executing function {function_name}: {e}")
-                                return {
-                                    "status": "error",
-                                    "message": f"Tool execution failed: {str(e)}",
-                                    "tool_attempted": function_name
-                                }
-
-            # If no function calls, provide direct analysis
-            return await self._provide_direct_analysis(context_data, user_id, prompt_text)
-
-        except Exception as e:
-            self.logger.error(f"Error in recommendation processing: {e}")
-            self.logger.error(f"Traceback: {traceback.format_exc()}")
-            return {"status": "error", "message": f"Internal error occurred while processing request: {str(e)}"}
-
-    def _prepare_spending_summary(self, spending_data: Dict[str, Any]) -> str:
-        """Prepare a summary of spending data for the model."""
-        try:
-            if not spending_data or 'data' not in spending_data:
-                return "No spending data available."
-            
-            transactions = spending_data['data']
-            if not transactions:
-                return "No transactions found."
-            
-            # Calculate category totals
-            category_totals = {}
-            total_amount = 0
-            
-            for transaction in transactions:
-                category = transaction.get('category', 'unknown')
-                amount = float(transaction.get('amount', 0))
-                
-                if category not in category_totals:
-                    category_totals[category] = 0
-                category_totals[category] += amount
-                total_amount += amount
-            
-            # Sort categories by spending
-            sorted_categories = sorted(category_totals.items(), key=lambda x: x[1], reverse=True)
-            
-            summary = f"Total Spending: ₹{total_amount:,.2f}\n"
-            summary += f"Number of Transactions: {len(transactions)}\n"
-            summary += "\nSpending by Category:\n"
-            
-            for category, amount in sorted_categories:
-                percentage = (amount / total_amount) * 100 if total_amount > 0 else 0
-                summary += f"- {category.title()}: ₹{amount:,.2f} ({percentage:.1f}%)\n"
-            
-            return summary
-            
-        except Exception as e:
-            self.logger.error(f"Error preparing spending summary: {e}")
-            return "Error processing spending data."
-
-    async def _provide_direct_analysis(self, spending_data: Dict[str, Any], user_id: str, query: str) -> Dict[str, Any]:
-        """Provide direct analysis when no function calls are made."""
-        try:
-            # Perform basic cost-benefit analysis
-            tool_output = await self.cost_benefit_analysis_tool.analyze_recommendations(
+            result = await self.alternative_discovery_tool.find_merchant_alternatives(
+                transaction_data=transaction_data,
                 user_id=user_id,
-                spending_analysis=spending_data,
-                original_query=query
+                criteria=criteria,
+                limit=limit
             )
             
-            return {
-                "status": "success",
-                "tool_executed": "perform_cost_benefit_analysis",
-                "tool_raw_output": tool_output,
-                "recommendations": tool_output.get("recommendations", []) if isinstance(tool_output, dict) else [],
-                "insights": tool_output.get("analysis_metadata", {}).get("summary", "Analysis completed") if isinstance(tool_output, dict) else "Analysis completed"
-            }
+            # Filter by focus merchants if specified
+            if focus_merchants and result.get("success"):
+                filtered_alternatives = {}
+                for merchant_name, alternatives in result.get("alternatives", {}).items():
+                    if merchant_name in focus_merchants:
+                        filtered_alternatives[merchant_name] = alternatives
+                result["alternatives"] = filtered_alternatives
+            
+            return result
             
         except Exception as e:
-            self.logger.error(f"Error in direct analysis: {e}")
-            return {
-                "status": "error",
-                "message": f"Direct analysis failed: {str(e)}"
-            }
-
-
-# The tool classes remain the same, but let's fix a few key issues in CostBenefitAnalysisTool
-
-class BehavioralAnalysisTool:
-    """Tool for analyzing user spending behavioral patterns."""
+            self.logger.error(f"Failed to execute merchant alternatives: {e}")
+            return {"success": False, "error": str(e)}
     
-    def __init__(self, project_id: str, logger):
-        self.project_id = project_id
-        self.logger = logger
-        self.db_connector = None
-
-    async def _get_db_connector(self):
-        """Get database connector instance."""
-        if not self.db_connector:
-            self.db_connector = await DatabaseConnector.get_instance(self.project_id)
-        return self.db_connector
-
-    async def analyze_patterns(self, user_id: str, lookback_months: int = 6, category_filter: Optional[str] = None) -> Dict[str, Any]:
-        """Analyze user's spending behavioral patterns."""
+    async def _execute_category_alternatives(
+        self,
+        user_id: str,
+        transaction_data: List[Dict[str, Any]],
+        target_category: str,
+        optimization_type: str = "cost_reduction"
+    ) -> Dict[str, Any]:
+        """
+        Execute category alternatives finding.
+        """
         try:
-            db = await self._get_db_connector()
+            self.logger.info(f"Finding category alternatives for {target_category} with optimization: {optimization_type}")
             
-            # Calculate date range
-            end_date = datetime.now()
-            start_date = end_date - timedelta(days=30 * lookback_months)
-            
-            # Base query for spending patterns
-            query = """
-                SELECT 
-                    t.category,
-                    COUNT(*) as transaction_count,
-                    SUM(t.amount) as total_spent,
-                    AVG(t.amount) as avg_transaction,
-                    MIN(t.amount) as min_transaction,
-                    MAX(t.amount) as max_transaction,
-                    EXTRACT(dow FROM t.transaction_date) as day_of_week,
-                    EXTRACT(hour FROM t.transaction_date) as hour_of_day,
-                    m.name as merchant_name,
-                    COUNT(DISTINCT m.merchant_id) as unique_merchants
-                FROM transactions t
-                LEFT JOIN merchants m ON t.merchant_id = m.merchant_id
-                WHERE t.user_id = $1 
-                AND t.transaction_date >= $2 
-                AND t.transaction_date <= $3
-            """
-            
-            params = [user_id, start_date, end_date]
-            
-            if category_filter:
-                query += " AND t.category = $4"
-                params.append(category_filter)
-            
-            query += """
-                GROUP BY t.category, EXTRACT(dow FROM t.transaction_date), 
-                         EXTRACT(hour FROM t.transaction_date), m.name
-                ORDER BY total_spent DESC
-            """
-            
-            results = await db.execute_query(query, *params)
-            
-            # Process behavioral patterns
-            patterns = self._process_behavioral_data(results)
-            
-            return {
-                "success": True,
-                "behavioral_patterns": patterns,
-                "analysis_period": {
-                    "start_date": start_date.isoformat(),
-                    "end_date": end_date.isoformat(),
-                    "lookback_months": lookback_months
-                },
-                "category_filter": category_filter,
-                "raw_data_summary": f"Analyzed {len(results)} transaction patterns"
-            }
-            
-        except Exception as e:
-            self.logger.error(f"Error in behavioral analysis: {e}")
-            return {
-                "success": False,
-                "error": str(e),
-                "behavioral_patterns": "Analysis failed due to system error"
-            }
-
-    def _process_behavioral_data(self, results: List) -> Dict[str, Any]:
-        """Process raw behavioral data into insights."""
-        category_patterns = {}
-        temporal_patterns = {"by_day": {}, "by_hour": {}}
-        merchant_preferences = {}
-        
-        for row in results:
-            category = row.get('category', 'unknown')
-            
-            # Category spending patterns
-            if category not in category_patterns:
-                category_patterns[category] = {
-                    "total_spent": 0,
-                    "transaction_count": 0,
-                    "avg_transaction": 0,
-                    "spending_frequency": "unknown"
-                }
-            
-            category_patterns[category]["total_spent"] += float(row.get('total_spent', 0))
-            category_patterns[category]["transaction_count"] += int(row.get('transaction_count', 0))
-            
-            # Temporal patterns
-            dow = int(row.get('day_of_week', 0))
-            hour = int(row.get('hour_of_day', 0))
-            
-            if dow not in temporal_patterns["by_day"]:
-                temporal_patterns["by_day"][dow] = 0
-            temporal_patterns["by_day"][dow] += float(row.get('total_spent', 0))
-            
-            if hour not in temporal_patterns["by_hour"]:
-                temporal_patterns["by_hour"][hour] = 0
-            temporal_patterns["by_hour"][hour] += float(row.get('total_spent', 0))
-        
-        return {
-            "category_patterns": category_patterns,
-            "temporal_patterns": temporal_patterns,
-            "insights": self._generate_behavioral_insights(category_patterns, temporal_patterns)
-        }
-
-    def _generate_behavioral_insights(self, category_patterns: Dict, temporal_patterns: Dict) -> List[str]:
-        """Generate actionable insights from behavioral patterns."""
-        insights = []
-        
-        # Top spending categories
-        sorted_categories = sorted(category_patterns.items(), key=lambda x: x[1]["total_spent"], reverse=True)
-        if sorted_categories:
-            top_category = sorted_categories[0]
-            insights.append(f"Primary spending category: {top_category[0]} (₹{top_category[1]['total_spent']:.2f})")
-        
-        # Day of week patterns
-        if temporal_patterns["by_day"]:
-            peak_day = max(temporal_patterns["by_day"].items(), key=lambda x: x[1])
-            day_names = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
-            insights.append(f"Highest spending day: {day_names[peak_day[0]]} (₹{peak_day[1]:.2f})")
-        
-        return insights
-
-
-class AlternativeDiscoveryTool:
-    """Tool for discovering cheaper alternatives using vector similarity."""
-    
-    def __init__(self, project_id: str, logger):
-        self.project_id = project_id
-        self.logger = logger
-        self.db_connector = None
-
-    async def _get_db_connector(self):
-        if not self.db_connector:
-            self.db_connector = await DatabaseConnector.get_instance(self.project_id)
-        return self.db_connector
-
-    async def discover_alternatives(self, user_id: str, item_description: str, item_category: str, 
-                                  price: float, location_preference: Optional[str] = None) -> Dict[str, Any]:
-        """Discover cheaper alternatives using vector similarity search."""
-        try:
-            # For now, provide mock alternatives since vector search might not be available
-            mock_alternatives = [
-                {
-                    "name": f"Budget alternative to {item_description}",
-                    "price": price * 0.8,
-                    "savings": price * 0.2,
-                    "savings_percentage": 20.0,
-                    "merchant": "Alternative Store",
-                    "similarity_score": 0.85,
-                    "purchase_history": 0
-                },
-                {
-                    "name": f"Generic version of {item_description}",
-                    "price": price * 0.7,
-                    "savings": price * 0.3,
-                    "savings_percentage": 30.0,
-                    "merchant": "Budget Store",
-                    "similarity_score": 0.75,
-                    "purchase_history": 0
-                }
-            ]
-            
-            return {
-                "success": True,
-                "original_item": {
-                    "description": item_description,
-                    "price": price,
-                    "category": item_category
-                },
-                "alternatives": mock_alternatives,
-                "total_alternatives_found": len(mock_alternatives),
-                "potential_savings": sum(alt["savings"] for alt in mock_alternatives)
-            }
-            
-        except Exception as e:
-            self.logger.error(f"Error in alternative discovery: {e}")
-            return {
-                "success": False,
-                "error": str(e),
-                "alternatives": []
-            }
-
-
-class BudgetOptimizationTool:
-    """Tool for optimizing budget allocation based on financial goals."""
-    
-    def __init__(self, project_id: str, logger):
-        self.project_id = project_id
-        self.logger = logger
-        self.db_connector = None
-
-    async def _get_db_connector(self):
-        if not self.db_connector:
-            self.db_connector = await DatabaseConnector.get_instance(self.project_id)
-        return self.db_connector
-
-    async def optimize_allocation(self, user_id: str, financial_goal: str, target_amount: float, 
-                                current_amount: float, focus_category: Optional[str] = None) -> Dict[str, Any]:
-        """Optimize budget allocation based on spending patterns and goals."""
-        try:
-            # Calculate required savings
-            required_savings = target_amount - current_amount
-            
-            # Mock spending data for demonstration
-            mock_spending = [
-                {"category": "shopping", "total_spent": 150000, "transaction_count": 45},
-                {"category": "electronics", "total_spent": 200000, "transaction_count": 25},
-                {"category": "food", "total_spent": 35000, "transaction_count": 60},
-                {"category": "groceries", "total_spent": 24000, "transaction_count": 30}
-            ]
-            
-            total_monthly_spending = sum(float(row['total_spent']) for row in mock_spending) / 3
-            
-            # Generate optimization suggestions
-            optimizations = self._generate_optimization_suggestions(
-                mock_spending, required_savings, focus_category, financial_goal
+            result = await self.alternative_discovery_tool.find_category_alternatives(
+                transaction_data=transaction_data,
+                user_id=user_id,
+                target_category=target_category,
+                optimization_type=optimization_type
             )
             
-            return {
-                "success": True,
-                "current_allocation": {
-                    "total_monthly_spending": total_monthly_spending,
-                    "category_breakdown": [
-                        {
-                            "category": row['category'],
-                            "monthly_amount": float(row['total_spent']) / 3,
-                            "percentage": (float(row['total_spent']) / 3) / total_monthly_spending * 100 if total_monthly_spending > 0 else 0
-                        }
-                        for row in mock_spending
-                    ]
-                },
-                "goal_analysis": {
-                    "financial_goal": financial_goal,
-                    "target_amount": target_amount,
-                    "current_amount": current_amount,
-                    "required_savings": required_savings
-                },
-                "optimized_allocation_suggestions": optimizations,
-                "projected_monthly_savings": sum(opt.get("monthly_savings", 0) for opt in optimizations)
-            }
+            return result
             
         except Exception as e:
-            self.logger.error(f"Error in budget optimization: {e}")
-            return {
-                "success": False,
-                "error": str(e),
-                "current_allocation_summary": "Budget optimization failed due to system error"
-            }
-
-    def _generate_optimization_suggestions(self, current_spending: List, required_savings: float, 
-                                         focus_category: Optional[str], goal: str) -> List[Dict[str, Any]]:
-        """Generate budget optimization suggestions."""
-        suggestions = []
-        
-        for spending_row in current_spending[:5]:  # Top 5 categories
-            category = spending_row['category']
-            monthly_amount = float(spending_row['total_spent']) / 3
-            
-            # Skip if focus category is specified and this isn't it
-            if focus_category and category != focus_category:
-                continue
-            
-            # Calculate potential reduction (10-30% based on category)
-            reduction_percentage = self._get_reduction_percentage(category)
-            potential_savings = monthly_amount * (reduction_percentage / 100)
-            
-            suggestions.append({
-                "category": category,
-                "current_monthly_spending": monthly_amount,
-                "suggested_reduction_percentage": reduction_percentage,
-                "monthly_savings": potential_savings,
-                "new_monthly_budget": monthly_amount - potential_savings,
-                "rationale": f"Reduce {category} spending by {reduction_percentage}% to support {goal}"
-            })
-        
-        return suggestions
-
-    def _get_reduction_percentage(self, category: str) -> float:
-        """Get suggested reduction percentage by category."""
-        reduction_map = {
-            "food": 15.0,
-            "shopping": 20.0,
-            "entertainment": 25.0,
-            "groceries": 10.0,
-            "electronics": 30.0,
-            "general": 15.0
-        }
-        return reduction_map.get(category.lower(), 15.0)
-
-
-class CostBenefitAnalysisTool:
-    """Tool for performing comprehensive cost-benefit analysis."""
+            self.logger.error(f"Failed to execute category alternatives: {e}")
+            return {"success": False, "error": str(e)}
     
-    def __init__(self, project_id: str, logger):
-        self.project_id = project_id
-        self.logger = logger
-        self.db_connector = None
-
-    async def _get_db_connector(self):
-        if not self.db_connector:
-            self.db_connector = await DatabaseConnector.get_instance(self.project_id)
-        return self.db_connector
-
-    async def analyze_recommendations(self, user_id: str, spending_analysis: Dict[str, Any], 
-                                    user_goals: Optional[Dict[str, Any]] = None, 
-                                    original_query: str = "") -> Dict[str, Any]:
-        """Perform cost-benefit analysis with spending data."""
+    async def _execute_product_alternatives(
+        self,
+        user_id: str,
+        transaction_data: List[Dict[str, Any]],
+        focus_items: Optional[List[str]] = None
+    ) -> Dict[str, Any]:
+        """
+        Execute product alternatives finding.
+        """
         try:
-            # Extract transaction data from spending analysis
-            transaction_data = spending_analysis.get('data', []) if spending_analysis else []
+            self.logger.info(f"Finding product alternatives for user {user_id}")
+            
+            result = await self.alternative_discovery_tool.find_product_alternatives(
+                transaction_data=transaction_data,
+                user_id=user_id,
+                focus_items=focus_items
+            )
+            
+            return result
+            
+        except Exception as e:
+            self.logger.error(f"Failed to execute product alternatives: {e}")
+            return {"success": False, "error": str(e)}
+    
+    async def _execute_spending_recommendations(
+        self,
+        user_id: str,
+        transaction_data: List[Dict[str, Any]],
+        recommendation_type: str = "savings",
+        priority_level: str = "all"
+    ) -> Dict[str, Any]:
+        """
+        Generate comprehensive spending recommendations.
+        """
+        try:
+            self.logger.info(f"Generating spending recommendations for user {user_id}")
+            
+            # Get merchant alternatives
+            merchant_alternatives = await self.alternative_discovery_tool.find_merchant_alternatives(
+                transaction_data=transaction_data,
+                user_id=user_id,
+                criteria=recommendation_type if recommendation_type in ["cost_savings", "quality", "convenience"] else "cost_savings"
+            )
+            
+            # Analyze categories for recommendations
+            categories = list(set(t.get('category', 'other') for t in transaction_data))
+            category_recommendations = []
+            
+            for category in categories[:3]:  # Limit to top 3 categories
+                category_result = await self.alternative_discovery_tool.find_category_alternatives(
+                    transaction_data=transaction_data,
+                    user_id=user_id,
+                    target_category=category,
+                    optimization_type="cost_reduction" if recommendation_type == "savings" else "quality_improvement"
+                )
+                if category_result.get("success"):
+                    category_recommendations.append(category_result)
+            
+            # Compile comprehensive recommendations
+            comprehensive_recommendations = {
+                "success": True,
+                "user_id": user_id,
+                "recommendation_type": recommendation_type,
+                "priority_level": priority_level,
+                "merchant_alternatives": merchant_alternatives,
+                "category_recommendations": category_recommendations,
+                "summary": self._generate_recommendation_summary(
+                    merchant_alternatives, 
+                    category_recommendations, 
+                    recommendation_type
+                ),
+                "timestamp": datetime.now().isoformat()
+            }
+            
+            # Filter by priority if specified
+            if priority_level != "all":
+                comprehensive_recommendations = self._filter_by_priority(
+                    comprehensive_recommendations, 
+                    priority_level
+                )
+            
+            return comprehensive_recommendations
+            
+        except Exception as e:
+            self.logger.error(f"Failed to generate spending recommendations: {e}")
+            return {"success": False, "error": str(e)}
+    
+    def _generate_recommendation_summary(
+        self,
+        merchant_alternatives: Dict[str, Any],
+        category_recommendations: List[Dict[str, Any]],
+        recommendation_type: str
+    ) -> Dict[str, Any]:
+        """Generate a summary of all recommendations."""
+        summary = {
+            "total_merchants_analyzed": 0,
+            "total_alternatives_found": 0,
+            "categories_analyzed": len(category_recommendations),
+            "potential_monthly_savings": 0,
+            "top_recommendations": [],
+            "quick_wins": []
+        }
+        
+        # Process merchant alternatives
+        if merchant_alternatives.get("success"):
+            alternatives_data = merchant_alternatives.get("alternatives", {})
+            summary["total_merchants_analyzed"] = len(alternatives_data)
+            
+            total_alternatives = sum(len(alts) for alts in alternatives_data.values())
+            summary["total_alternatives_found"] = total_alternatives
+            
+            # Calculate potential savings
+            total_savings = merchant_alternatives.get("total_potential_savings", {})
+            summary["potential_monthly_savings"] = total_savings.get("monthly_potential", 0)
+            
+            # Extract top recommendations
+            for merchant, alternatives in alternatives_data.items():
+                if alternatives:
+                    best_alt = alternatives[0]  # First one is usually best scored
+                    if best_alt.get("financial_impact", {}).get("savings_percentage", 0) > 10:
+                        summary["top_recommendations"].append({
+                            "current_merchant": merchant,
+                            "recommended_alternative": best_alt.get("name"),
+                            "savings_percentage": best_alt.get("financial_impact", {}).get("savings_percentage", 0),
+                            "reason": best_alt.get("recommendation_reason", "")
+                        })
+        
+        # Process category recommendations for quick wins
+        for cat_rec in category_recommendations:
+            if cat_rec.get("success") and cat_rec.get("alternatives"):
+                category = cat_rec.get("target_category", "Unknown")
+                alternatives = cat_rec.get("alternatives", [])
+                
+                if alternatives:
+                    best_alt = alternatives[0]
+                    savings_pct = best_alt.get("financial_impact", {}).get("savings_percentage", 0)
+                    
+                    if savings_pct > 15:  # High savings threshold for quick wins
+                        summary["quick_wins"].append({
+                            "category": category,
+                            "recommended_merchant": best_alt.get("name"),
+                            "savings_percentage": savings_pct,
+                            "action": f"Try {best_alt.get('name')} for your next {category} purchase"
+                        })
+        
+        return summary
+    
+    def _filter_by_priority(
+        self,
+        recommendations: Dict[str, Any],
+        priority_level: str
+    ) -> Dict[str, Any]:
+        """Filter recommendations by priority level."""
+        if priority_level == "high":
+            # Keep only high-impact recommendations
+            summary = recommendations.get("summary", {})
+            high_priority_recs = []
+            
+            for rec in summary.get("top_recommendations", []):
+                if rec.get("savings_percentage", 0) > 15:
+                    high_priority_recs.append(rec)
+            
+            summary["top_recommendations"] = high_priority_recs
+            recommendations["summary"] = summary
+            
+        elif priority_level == "medium":
+            # Keep medium-impact recommendations
+            summary = recommendations.get("summary", {})
+            medium_priority_recs = []
+            
+            for rec in summary.get("top_recommendations", []):
+                savings_pct = rec.get("savings_percentage", 0)
+                if 5 <= savings_pct <= 15:
+                    medium_priority_recs.append(rec)
+            
+            summary["top_recommendations"] = medium_priority_recs
+            recommendations["summary"] = summary
+            
+        elif priority_level == "low":
+            # Keep low-impact but still valuable recommendations
+            summary = recommendations.get("summary", {})
+            low_priority_recs = []
+            
+            for rec in summary.get("top_recommendations", []):
+                if rec.get("savings_percentage", 0) < 5:
+                    low_priority_recs.append(rec)
+            
+            summary["top_recommendations"] = low_priority_recs
+            recommendations["summary"] = summary
+        
+        return recommendations
+    
+    async def process(self, request: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Main processing entry point for recommendation queries.
+        Expects transaction data from financial analysis results.
+        """
+        start_time = time.time()
+        try:
+            self.logger.info("Processing recommendation request")
+
+            # Extract user ID
+            user_id = request.get("user_id")
+            if not user_id:
+                return {
+                    "success": False,
+                    "error": "User ID is required for recommendations"
+                }
+
+            # Extract and normalize transaction data using the new method
+            transaction_data = self._extract_transaction_data(request)
             
             if not transaction_data:
                 return {
                     "success": False,
-                    "error": "No transaction data available for analysis",
-                    "recommendations": []
+                    "error": "No valid transaction data found in request",
+                    "debug_info": {
+                        "request_keys": list(request.keys()),
+                        "extracted_transactions": len(transaction_data)
+                    }
                 }
             
-            # Analyze spending patterns
-            category_spending = self._analyze_category_spending(transaction_data)
+            self.logger.info(f"Processing {len(transaction_data)} transactions for recommendations")
             
-            # Generate recommendations based on spending patterns
-            recommendations = self._generate_recommendations(category_spending, user_id, original_query)
+            # Determine recommendation type from request
+            recommendation_type = request.get("recommendation_type", "savings")
+            analysis_type = request.get("analysis_type", "general")
             
-            return {
-                "success": True,
-                "recommendations": recommendations,
-                "total_scenarios_analyzed": len(recommendations),
-                "embedding_matched_recommendations": 0,  # Not using embeddings in this simplified version
-                "aggregate_potential_savings": sum(r['financial_impact']['net_annual_impact'] for r in recommendations),
-                "analysis_metadata": {
-                    "user_id": user_id,
-                    "original_query": original_query,
-                    "categories_analyzed": len(category_spending),
-                    "total_transactions": len(transaction_data)
-                }
-            }
+            # Map analysis types to recommendation approaches
+            if analysis_type in ["spending_analysis", "category_breakdown"]:
+                recommendation_type = "cost_savings"
+            elif analysis_type in ["merchant_analysis"]:
+                recommendation_type = "diversification"
             
-        except Exception as e:
-            self.logger.error(f"Error in cost-benefit analysis: {e}")
-            return {
-                "success": False,
-                "error": str(e),
-                "recommendations": [],
-                "analysis_metadata": {"error": True, "error_message": str(e)}
-            }
-
-    def _analyze_category_spending(self, transactions: List[Dict]) -> Dict[str, Dict]:
-        """Analyze spending by category."""
-        category_spending = {}
-        
-        for transaction in transactions:
-            category = transaction.get('category', 'unknown')
-            amount = float(transaction.get('amount', 0))
+            # Generate comprehensive recommendations
+            recommendations = await self._execute_spending_recommendations(
+                user_id=user_id,
+                transaction_data=transaction_data,
+                recommendation_type=recommendation_type,
+                priority_level="all"
+            )
             
-            if category not in category_spending:
-                category_spending[category] = {
-                    'total': 0,
-                    'count': 0,
-                    'avg': 0,
-                    'transactions': []
-                }
-            
-            category_spending[category]['total'] += amount
-            category_spending[category]['count'] += 1
-            category_spending[category]['transactions'].append(transaction)
-        
-        # Calculate averages
-        for category in category_spending:
-            data = category_spending[category]
-            data['avg'] = data['total'] / data['count'] if data['count'] > 0 else 0
-        
-        return category_spending
-
-    def _generate_recommendations(self, category_spending: Dict, user_id: str, query: str) -> List[Dict]:
-        """Generate recommendations based on category spending."""
-        recommendations = []
-        
-        # Sort categories by spending amount
-        sorted_categories = sorted(category_spending.items(), key=lambda x: x[1]['total'], reverse=True)
-        
-        for i, (category, data) in enumerate(sorted_categories[:5]):  # Top 5 categories
-            monthly_spending = data['total'] / 6  # Assuming 6 months of data
-            
-            # Different recommendation types based on category
-            if category in ['shopping', 'electronics']:
-                potential_savings = monthly_spending * 0.25  # 25% potential savings
-                complexity = 'medium'
-                description = f"Optimize {category} purchases by comparing prices and waiting for sales"
-            elif category in ['food', 'groceries']:
-                potential_savings = monthly_spending * 0.15  # 15% potential savings
-                complexity = 'low'
-                description = f"Reduce {category} expenses through meal planning and bulk buying"
-            else:
-                potential_savings = monthly_spending * 0.20  # 20% potential savings
-                complexity = 'medium'
-                description = f"Review and optimize {category} spending patterns"
-            
-            recommendation = {
-                "id": f"rec_{user_id}_{i}",
-                "type": "category_optimization",
-                "description": description,
-                "financial_impact": {
-                    "potential_monthly_savings": potential_savings,
-                    "implementation_cost": 0,
-                    "net_annual_impact": potential_savings * 12
-                },
-                "implementation_complexity": complexity,
-                "category": category,
-                "similarity_score": 0,
-                "embedding_matched": False,
-                "current_monthly_spending": monthly_spending,
-                "transaction_count": data['count']
-            }
-            recommendations.append(recommendation)
-        
-        return recommendations
-
-
-class GoalAlignmentTool:
-    """Tool for aligning recommendations with user's financial goals."""
-    
-    def __init__(self, project_id: str, logger):
-        self.project_id = project_id
-        self.logger = logger
-        self.db_connector = None
-
-    async def _get_db_connector(self):
-        if not self.db_connector:
-            self.db_connector = await DatabaseConnector.get_instance(self.project_id)
-        return self.db_connector
-
-    async def align_with_goals(self, user_id: str, recommendation_details: str, 
-                              impact_estimate: Optional[str] = None, 
-                              relevant_goals: Optional[List[str]] = None) -> Dict[str, Any]:
-        """Align recommendations with user's financial goals."""
-        try:
-            # Mock goals for demonstration - in production, fetch from database
-            mock_goals = [
-                {
-                    "goal_id": "goal_1",
-                    "goal_type": "emergency_fund",
-                    "target_amount": 100000,
-                    "current_amount": 25000,
-                    "priority": 1,
-                    "description": "Build emergency fund"
-                },
-                {
-                    "goal_id": "goal_2", 
-                    "goal_type": "investment",
-                    "target_amount": 500000,
-                    "current_amount": 150000,
-                    "priority": 2,
-                    "description": "Investment portfolio growth"
-                }
-            ]
-            
-            if not mock_goals:
-                return {
-                    "success": True,
-                    "alignment_score": 0.5,  # Neutral if no goals
-                    "aligned_goals": [],
-                    "alignment_analysis": "No active financial goals found for alignment analysis",
-                    "recommendations": [{
-                        "description": recommendation_details,
-                        "alignment_notes": "General recommendation - consider setting financial goals for better alignment"
-                    }]
-                }
-            
-            # Analyze alignment with each goal
-            goal_alignments = []
-            for goal in mock_goals:
-                alignment = self._analyze_goal_alignment(
-                    goal, recommendation_details, impact_estimate
-                )
-                goal_alignments.append(alignment)
-            
-            # Calculate overall alignment score
-            overall_score = self._calculate_overall_alignment_score(goal_alignments)
-            
-            # Generate aligned recommendations
-            aligned_recommendations = self._generate_aligned_recommendations(
-                goal_alignments, recommendation_details, impact_estimate
+            # Enhance with specific insights based on transaction data
+            enhanced_recommendations = await self._enhance_recommendations_with_insights(
+                recommendations,
+                transaction_data,
+                user_id
             )
             
             return {
                 "success": True,
-                "alignment_score": overall_score,
-                "aligned_goals": [
-                    {
-                        "goal_id": goal['goal_id'],
-                        "goal_type": goal['goal_type'],
-                        "target_amount": float(goal['target_amount']),
-                        "current_amount": float(goal['current_amount']),
-                        "alignment_score": alignment['score'],
-                        "contribution_potential": alignment['contribution_potential']
-                    }
-                    for goal, alignment in zip(mock_goals, goal_alignments)
-                    if alignment['score'] > 0.3
-                ],
-                "alignment_analysis": self._generate_alignment_analysis(goal_alignments, mock_goals),
-                "recommendations": aligned_recommendations
+                "recommendations": enhanced_recommendations,
+                "metadata": {
+                    "transactions_analyzed": len(transaction_data),
+                    "recommendation_type": recommendation_type,
+                    "execution_time": time.time() - start_time,
+                    "timestamp": datetime.now().isoformat()
+                }
             }
-            
+
         except Exception as e:
-            self.logger.error(f"Error in goal alignment: {e}")
+            self.logger.error(f"Error during recommendation processing: {str(e)}")
             return {
                 "success": False,
                 "error": str(e),
-                "alignment_score": 0,
-                "aligned_goals": [],
-                "recommendations": []
+                "debug_info": {
+                    "request_keys": list(request.keys()) if isinstance(request, dict) else "Not a dict",
+                    "request_type": type(request).__name__
+                }
             }
-
-    def _analyze_goal_alignment(self, goal: Dict, recommendation: str, impact_estimate: Optional[str]) -> Dict[str, Any]:
-        """Analyze how a recommendation aligns with a specific goal."""
-        goal_type = goal.get('goal_type', '').lower()
-        target_amount = float(goal.get('target_amount', 0))
-        current_amount = float(goal.get('current_amount', 0))
-        remaining_amount = target_amount - current_amount
+    
+    async def _enhance_recommendations_with_insights(
+        self,
+        recommendations: Dict[str, Any],
+        transaction_data: List[Dict[str, Any]],
+        user_id: str
+    ) -> Dict[str, Any]:
+        """Enhance recommendations with additional insights from transaction analysis."""
+        try:
+            # Analyze transaction patterns
+            patterns = self._analyze_transaction_patterns(transaction_data)
+            
+            # Add pattern-based insights
+            recommendations["transaction_insights"] = {
+                "spending_patterns": patterns,
+                "frequent_merchants": self._get_frequent_merchants(transaction_data),
+                "category_distribution": self._get_category_distribution(transaction_data),
+                "spending_trends": self._analyze_spending_trends(transaction_data)
+            }
+            
+            # Add personalized recommendations based on patterns
+            personalized_recs = self._generate_personalized_recommendations(
+                patterns, 
+                transaction_data
+            )
+            recommendations["personalized_recommendations"] = personalized_recs
+            
+            return recommendations
+            
+        except Exception as e:
+            self.logger.error(f"Failed to enhance recommendations: {e}")
+            return recommendations  # Return original if enhancement fails
+    
+    def _analyze_transaction_patterns(self, transaction_data: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Analyze patterns in transaction data."""
+        if not transaction_data:
+            return {}
         
-        # Extract potential savings from impact estimate
-        potential_savings = self._extract_savings_from_impact(impact_estimate)
+        # Calculate basic statistics
+        amounts = [float(t.get('amount', 0)) for t in transaction_data]
+        total_spent = sum(amounts)
+        avg_transaction = total_spent / len(amounts) if amounts else 0
         
-        # Calculate alignment score based on goal type and recommendation content
-        alignment_score = self._calculate_goal_specific_alignment(goal_type, recommendation, potential_savings)
+        # Analyze by payment method
+        payment_methods = {}
+        for t in transaction_data:
+            method = t.get('payment_method', 'Unknown')
+            payment_methods[method] = payment_methods.get(method, 0) + float(t.get('amount', 0))
         
-        # Calculate contribution potential
-        contribution_potential = min(potential_savings / remaining_amount, 1.0) if remaining_amount > 0 else 0
+        # Analyze by date patterns
+        dates = [t.get('transaction_date') for t in transaction_data if t.get('transaction_date')]
+        date_range = {
+            "earliest": min(dates) if dates else None,
+            "latest": max(dates) if dates else None,
+            "days_span": len(set(dates)) if dates else 0
+        }
         
         return {
-            'score': alignment_score,
-            'contribution_potential': contribution_potential,
-            'potential_monthly_contribution': potential_savings,
-            'goal_type': goal_type,
-            'remaining_amount': remaining_amount
+            "total_transactions": len(transaction_data),
+            "total_amount": round(total_spent, 2),
+            "average_transaction": round(avg_transaction, 2),
+            "payment_method_breakdown": payment_methods,
+            "date_analysis": date_range
         }
-
-    def _extract_savings_from_impact(self, impact_estimate: Optional[str]) -> float:
-        """Extract savings amount from impact estimate string."""
-        if not impact_estimate:
-            return 1000.0  # Default assumption for mock data
+    
+    def _get_frequent_merchants(self, transaction_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Get most frequent merchants from transaction data."""
+        if not transaction_data:
+            return []
         
-        # Simple regex to find dollar amounts
-        import re
-        amounts = re.findall(r'[₹$]?(\d+(?:\.\d{2})?)', impact_estimate)
+        merchant_stats = {}
+        for t in transaction_data:
+            merchant = t.get('merchant_name', 'Unknown')
+            if merchant not in merchant_stats:
+                merchant_stats[merchant] = {
+                    "name": merchant,
+                    "normalized": t.get('merchant_normalized', merchant),
+                    "transaction_count": 0,
+                    "total_spent": 0,
+                    "categories": set()
+                }
+            
+            merchant_stats[merchant]["transaction_count"] += 1
+            merchant_stats[merchant]["total_spent"] += float(t.get('amount', 0))
+            merchant_stats[merchant]["categories"].add(t.get('category', 'other'))
         
-        if amounts:
-            return float(amounts[0])
+        # Convert to list and sort by frequency
+        frequent_merchants = []
+        for merchant, stats in merchant_stats.items():
+            stats["categories"] = list(stats["categories"])
+            stats["avg_transaction"] = stats["total_spent"] / stats["transaction_count"] if stats["transaction_count"] > 0 else 0
+            frequent_merchants.append(stats)
         
-        return 1000.0  # Default fallback
-
-    def _calculate_goal_specific_alignment(self, goal_type: str, recommendation: str, potential_savings: float) -> float:
-        """Calculate alignment score based on goal type and recommendation."""
-        recommendation_lower = recommendation.lower()
+        return sorted(frequent_merchants, key=lambda x: x["transaction_count"], reverse=True)[:10]
+    
+    def _get_category_distribution(self, transaction_data: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Analyze spending distribution by category."""
+        if not transaction_data:
+            return {}
         
-        # Goal type alignment weights
-        alignment_weights = {
-            'emergency_fund': 0.9 if 'save' in recommendation_lower or 'reduce' in recommendation_lower else 0.3,
-            'debt_payoff': 0.8 if 'reduce' in recommendation_lower or 'optimize' in recommendation_lower else 0.4,
-            'investment': 0.7 if 'save' in recommendation_lower or 'alternative' in recommendation_lower else 0.3,
-            'vacation': 0.6 if 'save' in recommendation_lower else 0.2,
-            'home_purchase': 0.8 if 'save' in recommendation_lower or 'reduce' in recommendation_lower else 0.4,
-            'retirement': 0.7 if 'optimize' in recommendation_lower or 'reduce' in recommendation_lower else 0.3
+        category_stats = {}
+        total_spent = 0
+        
+        for t in transaction_data:
+            category = t.get('category', 'other')
+            amount = float(t.get('amount', 0))
+            total_spent += amount
+            
+            if category not in category_stats:
+                category_stats[category] = {
+                    "total_spent": 0,
+                    "transaction_count": 0,
+                    "merchants": set()
+                }
+            
+            category_stats[category]["total_spent"] += amount
+            category_stats[category]["transaction_count"] += 1
+            category_stats[category]["merchants"].add(t.get('merchant_name', 'Unknown'))
+        
+        # Calculate percentages and format
+        for category, stats in category_stats.items():
+            stats["percentage"] = (stats["total_spent"] / total_spent * 100) if total_spent > 0 else 0
+            stats["avg_transaction"] = stats["total_spent"] / stats["transaction_count"] if stats["transaction_count"] > 0 else 0
+            stats["merchants"] = list(stats["merchants"])
+            stats["unique_merchants"] = len(stats["merchants"])
+        
+        return category_stats
+    
+    def _analyze_spending_trends(self, transaction_data: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Analyze spending trends over time."""
+        if not transaction_data:
+            return {}
+        
+        # Group by date
+        daily_spending = {}
+        for t in transaction_data:
+            date = t.get('transaction_date')
+            if date:
+                amount = float(t.get('amount', 0))
+                daily_spending[date] = daily_spending.get(date, 0) + amount
+        
+        if not daily_spending:
+            return {}
+        
+        # Calculate trend metrics
+        spending_values = list(daily_spending.values())
+        dates = sorted(daily_spending.keys())
+        
+        trend_analysis = {
+            "total_days": len(dates),
+            "daily_average": sum(spending_values) / len(spending_values) if spending_values else 0,
+            "highest_spending_day": {
+                "date": max(daily_spending, key=daily_spending.get),
+                "amount": max(spending_values)
+            } if spending_values else None,
+            "lowest_spending_day": {
+                "date": min(daily_spending, key=daily_spending.get),
+                "amount": min(spending_values)
+            } if spending_values else None,
+            "date_range": {
+                "start": dates[0] if dates else None,
+                "end": dates[-1] if dates else None
+            }
         }
         
-        base_score = alignment_weights.get(goal_type, 0.5)
-        
-        # Boost score if potential savings are significant
-        if potential_savings > 5000:
-            base_score *= 1.2
-        elif potential_savings > 2000:
-            base_score *= 1.1
-        
-        return min(base_score, 1.0)
-
-    def _calculate_overall_alignment_score(self, goal_alignments: List[Dict]) -> float:
-        """Calculate overall alignment score across all goals."""
-        if not goal_alignments:
-            return 0.5
-        
-        # Weighted average based on alignment scores and contribution potential
-        total_weight = 0
-        weighted_sum = 0
-        
-        for alignment in goal_alignments:
-            weight = alignment['contribution_potential'] + 0.1  # Minimum weight
-            weighted_sum += alignment['score'] * weight
-            total_weight += weight
-        
-        return weighted_sum / total_weight if total_weight > 0 else 0.5
-
-    def _generate_alignment_analysis(self, goal_alignments: List[Dict], user_goals: List[Dict]) -> str:
-        """Generate human-readable alignment analysis."""
-        if not goal_alignments:
-            return "No goals available for alignment analysis."
-        
-        high_alignment_goals = [
-            (goal, alignment) for goal, alignment in zip(user_goals, goal_alignments)
-            if alignment['score'] > 0.6
-        ]
-        
-        if high_alignment_goals:
-            goal_types = [goal['goal_type'].replace('_', ' ') for goal, _ in high_alignment_goals]
-            return f"This recommendation strongly aligns with your {', '.join(goal_types)} goals. " \
-                   f"It could contribute significantly to {len(high_alignment_goals)} of your financial objectives."
-        else:
-            return "This recommendation has moderate alignment with your current financial goals. " \
-                   "Consider how it fits into your overall financial strategy."
-
-    def _generate_aligned_recommendations(self, goal_alignments: List[Dict], 
-                                        recommendation_details: str, 
-                                        impact_estimate: Optional[str]) -> List[Dict[str, Any]]:
-        """Generate recommendations aligned with user goals."""
+        return trend_analysis
+    
+    def _generate_personalized_recommendations(
+        self,
+        patterns: Dict[str, Any],
+        transaction_data: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """Generate personalized recommendations based on transaction patterns."""
         recommendations = []
         
-        # Primary recommendation
-        recommendations.append({
-            "description": recommendation_details,
-            "alignment_notes": "Primary recommendation based on spending analysis",
-            "estimated_impact": impact_estimate or "Impact analysis pending",
-            "priority": "high"
-        })
-        
-        # Goal-specific recommendations
-        for alignment in goal_alignments:
-            if alignment['score'] > 0.5:
-                goal_type = alignment['goal_type']
-                monthly_contribution = alignment['potential_monthly_contribution']
-                
+        # High spending merchant recommendations
+        frequent_merchants = self._get_frequent_merchants(transaction_data)
+        if frequent_merchants:
+            top_merchant = frequent_merchants[0]
+            if top_merchant["transaction_count"] > 2:
                 recommendations.append({
-                    "description": f"Allocate savings from this optimization toward your {goal_type.replace('_', ' ')} goal",
-                    "alignment_notes": f"Could contribute ₹{monthly_contribution:.2f}/month toward this goal",
-                    "estimated_impact": f"₹{monthly_contribution * 12:.2f} annual contribution",
-                    "priority": "medium"
+                    "type": "merchant_optimization",
+                    "priority": "high",
+                    "title": f"Optimize spending at {top_merchant['name']}",
+                    "description": f"You've spent ₹{top_merchant['total_spent']:.0f} across {top_merchant['transaction_count']} transactions. Consider exploring alternatives.",
+                    "action": f"Look for alternatives to {top_merchant['name']} in the {', '.join(top_merchant['categories'])} category"
                 })
         
-        return recommendations[:3]  # Limit to top 3 recommendations
+        # Category diversification recommendations  
+        category_dist = self._get_category_distribution(transaction_data)
+        if category_dist:
+            dominant_category = max(category_dist.items(), key=lambda x: x[1]["percentage"])
+            if dominant_category[1]["percentage"] > 60:  # If one category dominates
+                recommendations.append({
+                    "type": "category_diversification",
+                    "priority": "medium",
+                    "title": f"High concentration in {dominant_category[0]} spending",
+                    "description": f"{dominant_category[1]['percentage']:.1f}% of your spending is in {dominant_category[0]}. Consider exploring cost-effective alternatives.",
+                    "action": f"Find cheaper alternatives in the {dominant_category[0]} category"
+                })
+        
+        # Payment method optimization
+        if patterns.get("payment_method_breakdown"):
+            cash_spending = patterns["payment_method_breakdown"].get("CASH", 0)
+            total_spending = patterns.get("total_amount", 0)
+            
+            if cash_spending > total_spending * 0.3:  # More than 30% cash
+                recommendations.append({
+                    "type": "payment_optimization",
+                    "priority": "low",
+                    "title": "Consider digital payment methods",
+                    "description": f"₹{cash_spending:.0f} spent in cash. Digital payments often offer cashback and better tracking.",
+                    "action": "Try UPI or card payments to earn rewards and better expense tracking"
+                })
+        
+        return recommendations
+    
+    def get_supported_recommendation_types(self) -> List[str]:
+        """Return list of supported recommendation types."""
+        return [
+            "merchant_alternatives",
+            "category_optimization", 
+            "product_alternatives",
+            "cost_savings",
+            "quality_improvement",
+            "convenience_optimization",
+            "spending_diversification",
+            "payment_optimization"
+        ]

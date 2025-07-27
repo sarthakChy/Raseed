@@ -216,6 +216,86 @@ class QueryTranslationAgent(BaseAgent):
         start_date = today - timedelta(days=months * 30)  # Approximate month calculation
         return start_date.isoformat(), today.isoformat()
 
+    # def _parse_relative_time_period(self, query: str, relative_period: str = None) -> Tuple[Optional[str], Optional[str], str]:
+    #     """
+    #     Parse relative time periods from query text and return appropriate date range.
+    #     Enhanced to handle comparison queries dynamically.
+    #     """
+    #     text_to_analyze = (relative_period or query).lower()
+    #     today = datetime.now().date()
+        
+    #     # Enhanced patterns for comparison queries
+    #     comparison_patterns = [
+    #         # More flexible patterns to catch "this month vs past 3 months"
+    #         (r'compar(?:e|ison).*(?:between|of)\s+([^,\s]+(?:\s+\d+\s+\w+)?)\s*(?:and|vs|versus)\s+([^,\s]+(?:\s+\d+\s+\w+)?)', 'comparison'),
+    #         (r'([^,\s]+(?:\s+\d+\s+\w+)?)\s+(?:vs|versus)\s+([^,\s]+(?:\s+\d+\s+\w+)?)', 'comparison'),
+    #         (r'(?:between|compare)\s+([^,\s]+(?:\s+\d+\s+\w+)?)\s+(?:and|vs|versus)\s+([^,\s]+(?:\s+\d+\s+\w+)?)', 'comparison'),
+    #         # "difference between X and Y"
+    #         (r'difference.*between\s+([^,\s]+(?:\s+\d+\s+\w+)?)\s*(?:and|vs)\s+([^,\s]+(?:\s+\d+\s+\w+)?)', 'comparison'),
+    #     ]
+        
+    #     # Check for comparison patterns first
+    #     for pattern, pattern_type in comparison_patterns:
+    #         match = re.search(pattern, text_to_analyze)
+    #         if match:
+    #             period1, period2 = match.groups()
+    #             # For comparisons, we need a broader range that covers both periods
+    #             start_date, end_date = self._calculate_comparison_range(period1.strip(), period2.strip())
+    #             if start_date and end_date:
+    #                 return start_date, end_date, f"comparison between {period1.strip()} and {period2.strip()}"
+        
+    #     # Existing patterns for single time periods...
+    #     comparison_patterns = [
+    #     # More flexible patterns to catch various comparison formats
+    #     (r'compar(?:e|ison).*(?:between|of)\s+([^,\s]+(?:\s+\d+\s+\w+)?)\s*(?:and|vs|versus)\s+([^,\s]+(?:\s+\d+\s+\w+)?)', 'comparison'),
+    #     (r'([^,\s]+(?:\s+\d+\s+\w+)?)\s+(?:vs|versus)\s+([^,\s]+(?:\s+\d+\s+\w+)?)', 'comparison'),
+    #     (r'(?:between|compare)\s+([^,\s]+(?:\s+\d+\s+\w+)?)\s+(?:and|vs|versus)\s+([^,\s]+(?:\s+\d+\s+\w+)?)', 'comparison'),
+    #     # "difference between X and Y"
+    #     (r'difference.*between\s+([^,\s]+(?:\s+\d+\s+\w+)?)\s*(?:and|vs)\s+([^,\s]+(?:\s+\d+\s+\w+)?)', 'comparison'),
+    #     # Enhanced patterns for year/week/day comparisons
+    #     (r'(this\s+year)\s+(?:vs|versus)\s+(last\s+year)', 'comparison'),
+    #     (r'(past\s+\d+\s+months?)\s+(?:vs|versus)\s+(past\s+year)', 'comparison'),
+    #     (r'(last\s+week)\s+(?:vs|versus)\s+(past\s+\d+\s+days?)', 'comparison'),
+    #     ]
+        
+    #     for pattern, pattern_type in patterns:
+    #         match = re.search(pattern, text_to_analyze)
+    #         if match:
+    #             if pattern_type == 'this_month':
+    #                 # Current month
+    #                 start_date = today.replace(day=1)
+    #                 return start_date.isoformat(), today.isoformat(), "this month"
+    #             elif pattern_type == 'last_month':
+    #                 # Previous month
+    #                 last_month_start, last_month_end = self._get_last_month_range()
+    #                 return last_month_start.isoformat(), last_month_end.isoformat(), "last month"
+    #             elif 'number' in pattern_type:
+    #                 value = int(match.group(1))
+    #                 unit = match.group(2)
+    #             else:
+    #                 value = 1
+    #                 unit = match.group(1)
+                
+    #             # Calculate start date based on unit (existing logic)
+    #             if unit in ['day', 'days']:
+    #                 start_date = today - timedelta(days=value)
+    #             elif unit in ['week', 'weeks']:
+    #                 start_date = today - timedelta(weeks=value)
+    #             elif unit in ['month', 'months']:
+    #                 start_date = today - timedelta(days=value * 30)
+    #             elif unit in ['quarter', 'quarters']:
+    #                 start_date = today - timedelta(days=value * 90)
+    #             elif unit in ['year', 'years']:
+    #                 start_date = today - timedelta(days=value * 365)
+    #             else:
+    #                 continue
+                
+    #             period_desc = f"past {value} {unit}{'s' if value > 1 else ''}"
+    #             return start_date.isoformat(), today.isoformat(), period_desc
+        
+    #     # If no pattern matched, return None values
+    #     return None, None, relative_period or "unspecified period"
+
     def _parse_relative_time_period(self, query: str, relative_period: str = None) -> Tuple[Optional[str], Optional[str], str]:
         """
         Parse relative time periods from query text and return appropriate date range.
@@ -244,54 +324,153 @@ class QueryTranslationAgent(BaseAgent):
                 if start_date and end_date:
                     return start_date, end_date, f"comparison between {period1.strip()} and {period2.strip()}"
         
-        # Existing patterns for single time periods...
-        comparison_patterns = [
-        # More flexible patterns to catch various comparison formats
-        (r'compar(?:e|ison).*(?:between|of)\s+([^,\s]+(?:\s+\d+\s+\w+)?)\s*(?:and|vs|versus)\s+([^,\s]+(?:\s+\d+\s+\w+)?)', 'comparison'),
-        (r'([^,\s]+(?:\s+\d+\s+\w+)?)\s+(?:vs|versus)\s+([^,\s]+(?:\s+\d+\s+\w+)?)', 'comparison'),
-        (r'(?:between|compare)\s+([^,\s]+(?:\s+\d+\s+\w+)?)\s+(?:and|vs|versus)\s+([^,\s]+(?:\s+\d+\s+\w+)?)', 'comparison'),
-        # "difference between X and Y"
-        (r'difference.*between\s+([^,\s]+(?:\s+\d+\s+\w+)?)\s*(?:and|vs)\s+([^,\s]+(?:\s+\d+\s+\w+)?)', 'comparison'),
-        # Enhanced patterns for year/week/day comparisons
-        (r'(this\s+year)\s+(?:vs|versus)\s+(last\s+year)', 'comparison'),
-        (r'(past\s+\d+\s+months?)\s+(?:vs|versus)\s+(past\s+year)', 'comparison'),
-        (r'(last\s+week)\s+(?:vs|versus)\s+(past\s+\d+\s+days?)', 'comparison'),
+        # Define patterns for single time periods
+        patterns = [
+            # Today, yesterday patterns
+            (r'(?:^|\s)(today|yesterday)(?:\s|$)', 'single_date'),
+            
+            # This/last period patterns
+            (r'(?:^|\s)(this\s+month)(?:\s|$)', 'this_month'),
+            (r'(?:^|\s)(last\s+month)(?:\s|$)', 'last_month'),
+            (r'(?:^|\s)(this\s+year)(?:\s|$)', 'this_year'),
+            (r'(?:^|\s)(last\s+year)(?:\s|$)', 'last_year'),
+            (r'(?:^|\s)(this\s+week)(?:\s|$)', 'this_week'),
+            (r'(?:^|\s)(last\s+week)(?:\s|$)', 'last_week'),
+            (r'(?:^|\s)(this\s+quarter)(?:\s|$)', 'this_quarter'),
+            (r'(?:^|\s)(last\s+quarter)(?:\s|$)', 'last_quarter'),
+            
+            # Past X period patterns
+            (r'past\s+(\d+)\s+(day|days)(?:\s|$)', 'past_number_days'),
+            (r'past\s+(\d+)\s+(week|weeks)(?:\s|$)', 'past_number_weeks'),
+            (r'past\s+(\d+)\s+(month|months)(?:\s|$)', 'past_number_months'),
+            (r'past\s+(\d+)\s+(quarter|quarters)(?:\s|$)', 'past_number_quarters'),
+            (r'past\s+(\d+)\s+(year|years)(?:\s|$)', 'past_number_years'),
+            
+            # Last X period patterns
+            (r'last\s+(\d+)\s+(day|days)(?:\s|$)', 'past_number_days'),
+            (r'last\s+(\d+)\s+(week|weeks)(?:\s|$)', 'past_number_weeks'),
+            (r'last\s+(\d+)\s+(month|months)(?:\s|$)', 'past_number_months'),
+            (r'last\s+(\d+)\s+(quarter|quarters)(?:\s|$)', 'past_number_quarters'),
+            (r'last\s+(\d+)\s+(year|years)(?:\s|$)', 'past_number_years'),
+            
+            # Special cases
+            (r'(?:^|\s)(past\s+year)(?:\s|$)', 'past_year'),
+            (r'(?:^|\s)(past\s+month)(?:\s|$)', 'past_month'),
+            (r'(?:^|\s)(past\s+week)(?:\s|$)', 'past_week'),
         ]
         
+        # Process patterns for single time periods
         for pattern, pattern_type in patterns:
             match = re.search(pattern, text_to_analyze)
             if match:
-                if pattern_type == 'this_month':
+                if pattern_type == 'single_date':
+                    date_ref = match.group(1)
+                    if date_ref == 'today':
+                        return today.isoformat(), today.isoformat(), "today"
+                    elif date_ref == 'yesterday':
+                        yesterday = today - timedelta(days=1)
+                        return yesterday.isoformat(), yesterday.isoformat(), "yesterday"
+                
+                elif pattern_type == 'this_month':
                     # Current month
                     start_date = today.replace(day=1)
                     return start_date.isoformat(), today.isoformat(), "this month"
+                    
                 elif pattern_type == 'last_month':
                     # Previous month
                     last_month_start, last_month_end = self._get_last_month_range()
                     return last_month_start.isoformat(), last_month_end.isoformat(), "last month"
-                elif 'number' in pattern_type:
+                    
+                elif pattern_type == 'this_year':
+                    # Current year
+                    start_date = today.replace(month=1, day=1)
+                    return start_date.isoformat(), today.isoformat(), "this year"
+                    
+                elif pattern_type == 'last_year':
+                    # Previous year
+                    start_date = today.replace(year=today.year-1, month=1, day=1)
+                    end_date = today.replace(year=today.year-1, month=12, day=31)
+                    return start_date.isoformat(), end_date.isoformat(), "last year"
+                    
+                elif pattern_type == 'this_week':
+                    # Monday to today
+                    monday = today - timedelta(days=today.weekday())
+                    return monday.isoformat(), today.isoformat(), "this week"
+                    
+                elif pattern_type == 'last_week':
+                    # Previous Monday to Sunday
+                    monday_this_week = today - timedelta(days=today.weekday())
+                    sunday_last_week = monday_this_week - timedelta(days=1)
+                    monday_last_week = sunday_last_week - timedelta(days=6)
+                    return monday_last_week.isoformat(), sunday_last_week.isoformat(), "last week"
+                    
+                elif pattern_type == 'this_quarter':
+                    # Current quarter
+                    quarter_month = ((today.month - 1) // 3) * 3 + 1
+                    start_date = today.replace(month=quarter_month, day=1)
+                    return start_date.isoformat(), today.isoformat(), "this quarter"
+                    
+                elif pattern_type == 'last_quarter':
+                    # Previous quarter
+                    current_quarter_month = ((today.month - 1) // 3) * 3 + 1
+                    if current_quarter_month == 1:
+                        # Q4 of previous year
+                        start_date = today.replace(year=today.year-1, month=10, day=1)
+                        end_date = today.replace(year=today.year-1, month=12, day=31)
+                    else:
+                        # Previous quarter in same year
+                        prev_quarter_month = current_quarter_month - 3
+                        start_date = today.replace(month=prev_quarter_month, day=1)
+                        # Last day of quarter
+                        if prev_quarter_month == 10:
+                            end_date = today.replace(month=12, day=31)
+                        elif prev_quarter_month == 7:
+                            end_date = today.replace(month=9, day=30)
+                        elif prev_quarter_month == 4:
+                            end_date = today.replace(month=6, day=30)
+                        else:  # prev_quarter_month == 1
+                            end_date = today.replace(month=3, day=31)
+                    return start_date.isoformat(), end_date.isoformat(), "last quarter"
+                    
+                elif pattern_type.startswith('past_number_'):
+                    # Handle patterns with numbers
                     value = int(match.group(1))
-                    unit = match.group(2)
-                else:
-                    value = 1
-                    unit = match.group(1)
-                
-                # Calculate start date based on unit (existing logic)
-                if unit in ['day', 'days']:
-                    start_date = today - timedelta(days=value)
-                elif unit in ['week', 'weeks']:
-                    start_date = today - timedelta(weeks=value)
-                elif unit in ['month', 'months']:
-                    start_date = today - timedelta(days=value * 30)
-                elif unit in ['quarter', 'quarters']:
-                    start_date = today - timedelta(days=value * 90)
-                elif unit in ['year', 'years']:
-                    start_date = today - timedelta(days=value * 365)
-                else:
-                    continue
-                
-                period_desc = f"past {value} {unit}{'s' if value > 1 else ''}"
-                return start_date.isoformat(), today.isoformat(), period_desc
+                    unit = match.group(2).rstrip('s')  # Remove 's' if present
+                    
+                    if unit == 'day':
+                        start_date = today - timedelta(days=value)
+                        period_desc = f"past {value} day{'s' if value > 1 else ''}"
+                    elif unit == 'week':
+                        start_date = today - timedelta(weeks=value)
+                        period_desc = f"past {value} week{'s' if value > 1 else ''}"
+                    elif unit == 'month':
+                        start_date = today - timedelta(days=value * 30)
+                        period_desc = f"past {value} month{'s' if value > 1 else ''}"
+                    elif unit == 'quarter':
+                        start_date = today - timedelta(days=value * 90)
+                        period_desc = f"past {value} quarter{'s' if value > 1 else ''}"
+                    elif unit == 'year':
+                        start_date = today - timedelta(days=value * 365)
+                        period_desc = f"past {value} year{'s' if value > 1 else ''}"
+                    else:
+                        continue
+                    
+                    return start_date.isoformat(), today.isoformat(), period_desc
+                    
+                elif pattern_type == 'past_year':
+                    # Past year = 365 days ago to today
+                    start_date = today - timedelta(days=365)
+                    return start_date.isoformat(), today.isoformat(), "past year"
+                    
+                elif pattern_type == 'past_month':
+                    # Past month = 30 days ago to today
+                    start_date = today - timedelta(days=30)
+                    return start_date.isoformat(), today.isoformat(), "past month"
+                    
+                elif pattern_type == 'past_week':
+                    # Past week = 7 days ago to today
+                    start_date = today - timedelta(days=7)
+                    return start_date.isoformat(), today.isoformat(), "past week"
         
         # If no pattern matched, return None values
         return None, None, relative_period or "unspecified period"
