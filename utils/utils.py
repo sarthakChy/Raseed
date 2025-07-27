@@ -140,7 +140,7 @@ def get_credentials():
     """Load credentials from environment variables."""
 
     try:
-        PROJECT_ID = os.getenv("PROJECT_ID")
+        PROJECT_ID = os.getenv("GCP_PROJECT_ID")
         LOCATION = os.getenv("GCP_LOCATION")
         GOOGLE_WALLET_ISSUER_ID = os.getenv("GOOGLE_WALLET_ISSUER_ID")
     except KeyError:
