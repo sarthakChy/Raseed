@@ -81,3 +81,7 @@ python-dateutil==2.9.0.post0
 pyparsing==3.2.3
 docstring_parser==0.16
 python-multipart==0.0.20
+google-cloud-secret-manager
+google-cloud-translate
+langdetect
+
