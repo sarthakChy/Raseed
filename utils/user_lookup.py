@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
 import os
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "D:\Google Agentic AI\Code Lab\Raseed\server\serviceAccountKey.json"
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.environ.get("FIREBASE_CREDENTIALS")
 
 async def get_user_id_by_firebase_uid(
     firebase_uid: str,
